@@ -13,6 +13,7 @@ import type { Editor } from "@tiptap/react";
 import { PatchPreview } from "./PatchPreview";
 import { parseAIResponse, applyPatch, applyPatches, type Patch } from "../utils/patchParser";
 
+
 interface Message {
   id: string;
   role: "user" | "assistant";
