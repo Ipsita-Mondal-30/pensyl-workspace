@@ -53,7 +53,7 @@ export function ChatPanel({
       id: "1",
       role: "assistant",
       content:
-        "Hello! I'm Intellirite AI, your intelligent coding assistant.\n\nI can help you:\n- Answer questions about your code\n- Explain how things work\n- Edit and improve your files\n- Reference multiple files with @filename\n\nI have access to your current file and can see the full context. Just ask me anything!",
+        "Hello! I'm Intellirite AI, your intelligent research paper assistant.\n\nI can help you:\n- Answer questions about your research paper\n- Explain concepts and improve your writing\n- Edit and enhance your paper\n- Reference multiple files with @filename\n\nI have access to your current file and can see the full context. Just ask me anything!",
       timestamp: new Date(),
     },
   ]);
@@ -410,27 +410,29 @@ export function ChatPanel({
       </div>
 
       {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto px-3 py-4 space-y-4">
-        {messages.map((message) => (
-          <MessageBubble
-            key={message.id}
-            message={message}
-            formatTime={formatTime}
-            onInsert={onInsertToEditor}
-            onReplace={onReplaceInEditor}
-            currentFileContent={currentFileContent}
-            currentFileName={currentFileName}
-            onAcceptPatch={handleAcceptPatch}
-            onRejectPatch={handleRejectPatch}
-            onAcceptAllPatches={handleAcceptAllPatches}
-            onRejectAllPatches={handleRejectAllPatches}
-          />
-        ))}
-        <div ref={messagesEndRef} />
+      <div className="flex-1 overflow-y-auto">
+        <div className="px-4 py-4 space-y-6">
+          {messages.map((message) => (
+            <MessageBubble
+              key={message.id}
+              message={message}
+              formatTime={formatTime}
+              onInsert={onInsertToEditor}
+              onReplace={onReplaceInEditor}
+              currentFileContent={currentFileContent}
+              currentFileName={currentFileName}
+              onAcceptPatch={handleAcceptPatch}
+              onRejectPatch={handleRejectPatch}
+              onAcceptAllPatches={handleAcceptAllPatches}
+              onRejectAllPatches={handleRejectAllPatches}
+            />
+          ))}
+          <div ref={messagesEndRef} />
+        </div>
       </div>
 
       {/* Input Area */}
-      <div className="border-t border-[var(--border-primary)] p-3 shrink-0">
+      <div className="border-t border-[var(--border-primary)] p-4 shrink-0 bg-[var(--bg-secondary)]">
         {/* Model Selector - Cursor style, above input */}
         <div className="relative mb-2">
           <button
@@ -629,13 +631,13 @@ export function ChatPanel({
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Ask Intellirite AI..."
+            placeholder="Ask about your research paper..."
             disabled={isLoading}
-            className="w-full px-3 py-2 pr-20 bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-lg text-sm text-[var(--text-primary)] placeholder-[var(--text-tertiary)] resize-none focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full px-4 py-3 pr-24 bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-lg text-sm text-[var(--text-primary)] placeholder-[var(--text-tertiary)] resize-none focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
             rows={1}
-            style={{ maxHeight: "120px", minHeight: "40px" }}
+            style={{ maxHeight: "120px", minHeight: "44px" }}
           />
-          <div className="absolute right-2 bottom-2 flex items-center gap-1">
+          <div className="absolute right-3 bottom-3 flex items-center gap-1.5">
             {/* Mic Button */}
             <button
               className="w-7 h-7 flex items-center justify-center hover:bg-[var(--bg-hover)] rounded transition-colors text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
@@ -784,7 +786,7 @@ function MessageBubble({
 
   return (
     <div
-      className={`group flex flex-col ${isUser ? "items-end" : "items-start"}`}
+      className={`group flex flex-col w-full ${isUser ? "items-end" : "items-start"}`}
       onMouseEnter={() => setShowActions(true)}
       onMouseLeave={() => setShowActions(false)}
       draggable={!isUser}
@@ -808,157 +810,159 @@ function MessageBubble({
 
       {/* Message Bubble - Only show text content, not the raw patch XML */}
       {message.content && message.content.trim().length > 0 && (
-      <div
-        className={`
-          relative max-w-[85%] rounded-lg px-3 py-2
-          ${
-            isUser
-              ? "bg-[var(--accent-primary)] text-white"
-              : "bg-[var(--bg-primary)] text-[var(--text-primary)] border border-[var(--border-primary)]"
-          }
-          ${isDragging ? "opacity-50" : ""}
-        `}
-      >
-        {/* Action Buttons (hover) */}
-        {!isUser && showActions && (
-          <div className="absolute -right-20 top-0 flex items-center gap-1">
-            <button
-              onClick={() => {
-                navigator.clipboard.writeText(message.content);
-                // Optional: show toast notification
-              }}
-              className="w-6 h-6 flex items-center justify-center bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] border border-[var(--border-primary)] rounded text-xs text-[var(--text-primary)] transition-colors"
-              title="Copy to clipboard"
-            >
-              📋
-            </button>
-            <button
-              onClick={() => onInsert?.(message.content)}
-              className="w-6 h-6 flex items-center justify-center bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] border border-[var(--border-primary)] rounded text-xs text-[var(--text-primary)] transition-colors"
-              title="Insert into editor"
-            >
-              +
-            </button>
-            <button
-              onClick={() => onReplace?.(message.content)}
-              className="w-6 h-6 flex items-center justify-center bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] border border-[var(--border-primary)] rounded text-xs text-[var(--text-primary)] transition-colors"
-              title="Replace in editor"
-            >
-              ↻
-            </button>
-          </div>
-        )}
-
-        {/* Message Content */}
-        <div className="text-sm break-words">
-          {message.content ? (
-            message.role === "assistant" ? (
-              <ReactMarkdown
-                components={{
-                  p: ({ children }) => (
-                    <p className="mb-2 last:mb-0 text-[var(--text-primary)]">
-                      {children}
-                    </p>
-                  ),
-                  code: ({ children, className }) => {
-                    const isInline = !className;
-                    return isInline ? (
-                      <code className="bg-[var(--bg-secondary)] px-1.5 py-0.5 rounded text-xs font-mono text-[var(--accent-primary)]">
-                        {children}
-                      </code>
-                    ) : (
-                      <code className="block bg-[var(--bg-secondary)] p-2 rounded text-xs font-mono overflow-x-auto text-[var(--text-primary)] my-2">
-                        {children}
-                      </code>
-                    );
-                  },
-                  pre: ({ children }) => (
-                    <pre className="bg-[var(--bg-secondary)] p-2 rounded text-xs font-mono overflow-x-auto mb-2 text-[var(--text-primary)]">
-                      {children}
-                    </pre>
-                  ),
-                  ul: ({ children }) => (
-                    <ul className="list-disc list-inside mb-2 space-y-1 text-[var(--text-primary)]">
-                      {children}
-                    </ul>
-                  ),
-                  ol: ({ children }) => (
-                    <ol className="list-decimal list-inside mb-2 space-y-1 text-[var(--text-primary)]">
-                      {children}
-                    </ol>
-                  ),
-                  li: ({ children }) => <li className="ml-2">{children}</li>,
-                  strong: ({ children }) => (
-                    <strong className="font-semibold text-[var(--text-primary)]">
-                      {children}
-                    </strong>
-                  ),
-                  em: ({ children }) => <em className="italic">{children}</em>,
-                  h1: ({ children }) => (
-                    <h1 className="text-lg font-bold mb-2 mt-3 first:mt-0 text-[var(--text-primary)]">
-                      {children}
-                    </h1>
-                  ),
-                  h2: ({ children }) => (
-                    <h2 className="text-base font-bold mb-2 mt-3 first:mt-0 text-[var(--text-primary)]">
-                      {children}
-                    </h2>
-                  ),
-                  h3: ({ children }) => (
-                    <h3 className="text-sm font-bold mb-1 mt-2 first:mt-0 text-[var(--text-primary)]">
-                      {children}
-                    </h3>
-                  ),
-                  blockquote: ({ children }) => (
-                    <blockquote className="border-l-2 border-[var(--border-primary)] pl-3 italic my-2 text-[var(--text-secondary)]">
-                      {children}
-                    </blockquote>
-                  ),
-                  a: ({ children, href }) => (
-                    <a
-                      href={href}
-                      className="text-[var(--accent-primary)] hover:underline"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      {children}
-                    </a>
-                  ),
+      <div className="w-full flex flex-col">
+        <div
+          className={`
+            relative w-full rounded-lg px-4 py-3 mb-1
+            ${
+              isUser
+                ? "bg-[var(--accent-primary)] text-white"
+                : "bg-[var(--bg-primary)] text-[var(--text-primary)] border border-[var(--border-primary)]"
+            }
+            ${isDragging ? "opacity-50" : ""}
+          `}
+        >
+          {/* Action Buttons (hover) - positioned inside the bubble, top right */}
+          {!isUser && showActions && (
+            <div className="absolute top-2 right-2 flex items-center gap-1.5 z-10">
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(message.content);
+                  // Optional: show toast notification
                 }}
+                className="w-7 h-7 flex items-center justify-center bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] border border-[var(--border-primary)] rounded text-xs text-[var(--text-primary)] transition-colors shadow-sm"
+                title="Copy to clipboard"
               >
-                {message.content}
-              </ReactMarkdown>
+                📋
+              </button>
+              <button
+                onClick={() => onInsert?.(message.content)}
+                className="w-7 h-7 flex items-center justify-center bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] border border-[var(--border-primary)] rounded text-xs text-[var(--text-primary)] transition-colors shadow-sm"
+                title="Insert into editor"
+              >
+                +
+              </button>
+              <button
+                onClick={() => onReplace?.(message.content)}
+                className="w-7 h-7 flex items-center justify-center bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] border border-[var(--border-primary)] rounded text-xs text-[var(--text-primary)] transition-colors shadow-sm"
+                title="Replace in editor"
+              >
+                ↻
+              </button>
+            </div>
+          )}
+
+          {/* Message Content */}
+          <div className="text-sm break-words pr-12">
+            {message.content ? (
+              message.role === "assistant" ? (
+                <ReactMarkdown
+                  components={{
+                    p: ({ children }) => (
+                      <p className="mb-2 last:mb-0 text-[var(--text-primary)] leading-relaxed">
+                        {children}
+                      </p>
+                    ),
+                    code: ({ children, className }) => {
+                      const isInline = !className;
+                      return isInline ? (
+                        <code className="bg-[var(--bg-secondary)] px-1.5 py-0.5 rounded text-xs font-mono text-[var(--accent-primary)]">
+                          {children}
+                        </code>
+                      ) : (
+                        <code className="block bg-[var(--bg-secondary)] p-3 rounded text-xs font-mono overflow-x-auto text-[var(--text-primary)] my-2 border border-[var(--border-primary)]">
+                          {children}
+                        </code>
+                      );
+                    },
+                    pre: ({ children }) => (
+                      <pre className="bg-[var(--bg-secondary)] p-3 rounded text-xs font-mono overflow-x-auto mb-2 text-[var(--text-primary)] border border-[var(--border-primary)]">
+                        {children}
+                      </pre>
+                    ),
+                    ul: ({ children }) => (
+                      <ul className="list-disc list-inside mb-2 space-y-1.5 text-[var(--text-primary)] ml-2">
+                        {children}
+                      </ul>
+                    ),
+                    ol: ({ children }) => (
+                      <ol className="list-decimal list-inside mb-2 space-y-1.5 text-[var(--text-primary)] ml-2">
+                        {children}
+                      </ol>
+                    ),
+                    li: ({ children }) => <li className="ml-1">{children}</li>,
+                    strong: ({ children }) => (
+                      <strong className="font-semibold text-[var(--text-primary)]">
+                        {children}
+                      </strong>
+                    ),
+                    em: ({ children }) => <em className="italic">{children}</em>,
+                    h1: ({ children }) => (
+                      <h1 className="text-lg font-bold mb-2 mt-3 first:mt-0 text-[var(--text-primary)]">
+                        {children}
+                      </h1>
+                    ),
+                    h2: ({ children }) => (
+                      <h2 className="text-base font-bold mb-2 mt-3 first:mt-0 text-[var(--text-primary)]">
+                        {children}
+                      </h2>
+                    ),
+                    h3: ({ children }) => (
+                      <h3 className="text-sm font-bold mb-1 mt-2 first:mt-0 text-[var(--text-primary)]">
+                        {children}
+                      </h3>
+                    ),
+                    blockquote: ({ children }) => (
+                      <blockquote className="border-l-2 border-[var(--border-primary)] pl-3 italic my-2 text-[var(--text-secondary)]">
+                        {children}
+                      </blockquote>
+                    ),
+                    a: ({ children, href }) => (
+                      <a
+                        href={href}
+                        className="text-[var(--accent-primary)] hover:underline"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        {children}
+                      </a>
+                    ),
+                  }}
+                >
+                  {message.content}
+                </ReactMarkdown>
+              ) : (
+                <div className="whitespace-pre-wrap text-[var(--text-primary)] leading-relaxed">
+                  {message.content}
+                </div>
+              )
             ) : (
-              <div className="whitespace-pre-wrap text-[var(--text-primary)]">
-                {message.content}
-              </div>
-            )
-          ) : (
-            <span className="text-[var(--text-tertiary)] italic">
-              Thinking...
-            </span>
+              <span className="text-[var(--text-tertiary)] italic">
+                Thinking...
+              </span>
+            )}
+          </div>
+
+          {/* Loading indicator for streaming */}
+          {!message.content && message.role === "assistant" && (
+            <div className="flex items-center gap-1.5 mt-2">
+              <div className="w-1.5 h-1.5 bg-[var(--accent-primary)] rounded-full animate-pulse" />
+              <div className="w-1.5 h-1.5 bg-[var(--accent-primary)] rounded-full animate-pulse delay-75" />
+              <div className="w-1.5 h-1.5 bg-[var(--accent-primary)] rounded-full animate-pulse delay-150" />
+            </div>
           )}
         </div>
 
-        {/* Loading indicator for streaming */}
-        {!message.content && message.role === "assistant" && (
-          <div className="flex items-center gap-1 mt-2">
-            <div className="w-1.5 h-1.5 bg-[var(--accent-primary)] rounded-full animate-pulse" />
-            <div className="w-1.5 h-1.5 bg-[var(--accent-primary)] rounded-full animate-pulse delay-75" />
-            <div className="w-1.5 h-1.5 bg-[var(--accent-primary)] rounded-full animate-pulse delay-150" />
-          </div>
-        )}
+        {/* Timestamp */}
+        <div
+          className={`text-[11px] mt-1.5 px-1 ${
+            isUser ? "text-white/70" : "text-[var(--text-tertiary)]"
+          }`}
+        >
+          {formatTime(message.timestamp)}
+        </div>
       </div>
       )}
-
-      {/* Timestamp */}
-      <div
-        className={`text-[10px] mt-1 ${
-          isUser ? "text-white/70" : "text-[var(--text-tertiary)]"
-        }`}
-      >
-        {formatTime(message.timestamp)}
-      </div>
     </div>
   );
 }

@@ -1,5 +1,3 @@
-@import "tailwindcss";
-
 /* TipTap Editor Styles */
 .ProseMirror {
   outline: none;
@@ -352,10 +350,11 @@
 }
 
 /* Global Styles for Intellirite */
-
-* {
-  margin: 0;
-  padding: 0;
+/* Note: Tailwind's preflight already handles margin/padding reset and box-sizing */
+/* Only add box-sizing for elements that might not be covered by Tailwind */
+*,
+*::before,
+*::after {
   box-sizing: border-box;
 }
 
@@ -414,26 +413,20 @@ textarea:focus-visible {
   outline-offset: -2px;
 }
 
-/* Button Reset */
+/* Button Reset - Less aggressive to allow Tailwind classes */
 button {
   font-family: inherit;
   font-size: inherit;
-  border: none;
-  background: none;
   cursor: pointer;
-  color: inherit;
-  padding: 0;
+  /* Don't reset border, background, padding, color - let Tailwind handle it */
 }
 
-/* Input Reset */
+/* Input Reset - Less aggressive to allow Tailwind classes */
 input,
 textarea {
   font-family: inherit;
   font-size: inherit;
-  color: inherit;
-  border: none;
-  background: none;
-  outline: none;
+  /* Don't reset border, background, color, outline - let Tailwind handle it */
 }
 
 /* Link Reset */
@@ -446,28 +439,7 @@ a:hover {
   color: var(--accent-hover);
 }
 
-/* Utility Classes */
-.flex {
-  display: flex;
-}
-
-.flex-col {
-  display: flex;
-  flex-direction: column;
-}
-
-.items-center {
-  align-items: center;
-}
-
-.justify-center {
-  justify-content: center;
-}
-
-.justify-between {
-  justify-content: space-between;
-}
-
+/* Custom Utility Classes - Only non-Tailwind utilities */
 .gap-xs {
   gap: var(--spacing-xs);
 }
@@ -484,30 +456,8 @@ a:hover {
   gap: var(--spacing-lg);
 }
 
-.text-sm {
-  font-size: var(--font-size-sm);
-}
-
-.text-base {
-  font-size: var(--font-size-base);
-}
-
-.text-md {
-  font-size: var(--font-size-md);
-}
-
-.text-lg {
-  font-size: var(--font-size-lg);
-}
-
-.font-medium {
-  font-weight: var(--font-weight-medium);
-}
-
-.font-semibold {
-  font-weight: var(--font-weight-semibold);
-}
-
+/* Custom text color utilities using CSS variables */
+/* Note: These are kept for backward compatibility but prefer using Tailwind's arbitrary values: text-[var(--text-secondary)] */
 .text-secondary {
   color: var(--text-secondary);
 }
@@ -688,7 +638,7 @@ button:active {
   transform: scale(0.95);
 }
 
-/* Smooth transitions for all interactive elements */
-.transition-all {
+/* Custom transition utility - Tailwind has transition-all but with different timing */
+.transition-smooth-all {
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
