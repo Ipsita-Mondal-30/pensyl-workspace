@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 
 // Icon Components
 const AppIcon = () => (
@@ -122,7 +122,6 @@ interface TopBarProps {
  */
 export function TopBar({ onOpenSettings }: TopBarProps = {}) {
   const [searchValue, setSearchValue] = useState("");
-  const [isMaximized] = useState(false);
   const [isMac, setIsMac] = useState(false);
 
   // Safely detect platform with fallback (client-side only)
@@ -142,71 +141,6 @@ export function TopBar({ onOpenSettings }: TopBarProps = {}) {
     }
   }, []);
 
-  // Initialize and listen to window state changes
-  useEffect(() => {
-    // Safely check if windowControls is available
-    if (typeof window !== "undefined" && (window as any).windowControls) {
-      try {
-        // Get initial window state
-        (window as any).windowControls
-          .getState()
-          .then((state: { isMaximized: boolean }) => {
-            setIsMaximized(state.isMaximized);
-          })
-          .catch((error: Error) => {
-            console.error("Failed to get initial window state:", error);
-          });
-
-        // Listen to window state changes
-        const unsubscribe = (window as any).windowControls.onStateChange(
-          (state: { isMaximized: boolean }) => {
-            setIsMaximized(state.isMaximized);
-          }
-        );
-
-        return unsubscribe;
-      } catch (error) {
-        console.error("Window controls not available:", error);
-      }
-    }
-  }, []);
-
-  // Window control handlers with error handling
-  const handleMinimize = useCallback(() => {
-    try {
-      if ((window as any).windowControls) {
-        (window as any).windowControls.minimize();
-      }
-    } catch (error) {
-      console.error("Failed to minimize window:", error);
-    }
-  }, []);
-
-  const handleMaximize = useCallback(() => {
-    try {
-      if ((window as any).windowControls) {
-        (window as any).windowControls.maximize();
-      }
-    } catch (error) {
-      console.error("Failed to maximize window:", error);
-    }
-  }, []);
-
-
-
-
-  
-
-
-  const handleClose = useCallback(() => {
-    try {
-      if ((window as any).windowControls) {
-        (window as any).windowControls.close();
-      }
-    } catch (error) {
-      console.error("Failed to close window:", error);
-    }
-  }, []);
 
   return (
     <div
