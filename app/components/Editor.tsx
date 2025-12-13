@@ -106,6 +106,7 @@ export const Editor = forwardRef<any, EditorProps>(function Editor(
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   const editor = useEditor({
+    immediatelyRender: false, // Required for SSR/Next.js to avoid hydration mismatches
     extensions: [
       StarterKit.configure({
         codeBlock: false, // We'll use CodeBlockLowlight instead

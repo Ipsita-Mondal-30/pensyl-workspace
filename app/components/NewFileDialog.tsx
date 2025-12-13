@@ -99,9 +99,10 @@ export function NewFileDialog({
   const handleCreate = () => {
     if (!fileName.trim()) return;
 
-    // Remove extension if user typed it
+    // For sections, just use the name as-is (no extension)
+    // For files, add extension
     const nameWithoutExt = fileName.replace(/\.[^.]+$/, "");
-    const finalFileName = `${nameWithoutExt}.${selectedExtension}`;
+    const finalFileName = selectedExtension ? `${nameWithoutExt}.${selectedExtension}` : nameWithoutExt;
     onCreate(finalFileName);
   };
 

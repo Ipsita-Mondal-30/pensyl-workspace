@@ -18,12 +18,25 @@ import type { TabData } from "./components/Tab";
 import TurndownService from "turndown";
 import { marked } from "marked";
 import { localStorageFS } from "./lib/localStorageFS";
+import {
+  parseSectionsFromHTML,
+  findSectionInEditor,
+  addSectionToDocument,
+  type Section,
+} from "./utils/sectionParser";
 
 function App() {
   const [currentFolder, setCurrentFolder] = useState<string | undefined>();
   const [files, setFiles] = useState<FileItem[]>([]);
   const [selectedFileId, setSelectedFileId] = useState<string | undefined>();
   const [fileSystemReady, setFileSystemReady] = useState(false);
+
+  // Section management
+  const [sections, setSections] = useState<Section[]>([]);
+  const [selectedSectionId, setSelectedSectionId] = useState<
+    string | undefined
+  >();
+  const MAIN_FILE_PATH = "root/research-paper.md";
 
   // Tab management
   const [tabs, setTabs] = useState<TabData[]>([]);
@@ -32,7 +45,7 @@ function App() {
   // Auto-save debounce refs
   const saveTimeouts = useRef<Map<string, NodeJS.Timeout>>(new Map());
   const turndownService = useRef(new TurndownService());
-  
+
   // Editor ref for AI chat integration
   const editorRef = useRef<any>(null);
 
@@ -67,12 +80,34 @@ function App() {
     onSubmit: () => {},
   });
 
-  // Initialize file system
+  // Initialize file system and create main file if needed
   useEffect(() => {
-    setFileSystemReady(true);
-    // Auto-open root folder
-    handleOpenFolder();
-  }, []);
+    const initialize = async () => {
+      setFileSystemReady(true);
+      // Auto-open root folder
+      await handleOpenFolder();
+
+      // Ensure main file exists
+      try {
+        const result = await localStorageFS.readFile(MAIN_FILE_PATH);
+        if (!result.success) {
+          // Create main file
+          await localStorageFS.writeFile(
+            MAIN_FILE_PATH,
+            "# Research Paper\n\n"
+          );
+        }
+        // Open main file
+        if (tabs.length === 0) {
+          await handleFileSelect(MAIN_FILE_PATH);
+        }
+      } catch (error) {
+        console.error("Error initializing main file:", error);
+      }
+    };
+
+    initialize();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load folder structure
   const loadFolder = useCallback(async (folderPath: string) => {
@@ -190,7 +225,18 @@ function App() {
     [currentFolder, loadFolder]
   );
 
-  // Handle file select - open file in tab
+  // Parse sections from editor content (defined early to avoid initialization issues)
+  const updateSections = useCallback((content: string) => {
+    try {
+      const parsedSections = parseSectionsFromHTML(content);
+      setSections(parsedSections);
+    } catch (error) {
+      console.error("Error parsing sections:", error);
+      setSections([]);
+    }
+  }, []);
+
+  // Handle file select - open file in tab (only one file for sections)
   const handleFileSelect = useCallback(
     async (fileId: string) => {
       setSelectedFileId(fileId);
@@ -199,6 +245,15 @@ function App() {
       const existingTab = tabs.find((tab) => tab.filePath === fileId);
       if (existingTab) {
         setActiveTabId(existingTab.id);
+        // Update sections
+        try {
+          const content = existingTab.content || "";
+          const parsedSections = parseSectionsFromHTML(content);
+          setSections(parsedSections);
+        } catch (error) {
+          console.error("Error parsing sections:", error);
+          setSections([]);
+        }
         return;
       }
 
@@ -216,9 +271,7 @@ function App() {
         } else {
           // For non-markdown files, convert plain text to HTML paragraphs
           if (!content.trim().startsWith("<")) {
-            const lines = content
-              .split("\n")
-              .filter((line) => line.trim());
+            const lines = content.split("\n").filter((line) => line.trim());
             if (lines.length > 0) {
               content = lines.map((line) => `<p>${line}</p>`).join("");
             } else {
@@ -236,8 +289,23 @@ function App() {
           content: content,
         };
 
-        setTabs((prev) => [...prev, newTab]);
+        // For section-based mode, only keep one tab open
+        if (fileId === MAIN_FILE_PATH) {
+          setTabs([newTab]);
+        } else {
+          setTabs((prev) => [...prev, newTab]);
+        }
         setActiveTabId(newTab.id);
+        // Update sections after tab is set
+        setTimeout(() => {
+          try {
+            const parsedSections = parseSectionsFromHTML(content);
+            setSections(parsedSections);
+          } catch (error) {
+            console.error("Error parsing sections:", error);
+            setSections([]);
+          }
+        }, 0);
       } catch (error) {
         console.error("Error opening file:", error);
         alert(`Failed to open file: ${error}`);
@@ -246,7 +314,45 @@ function App() {
     [tabs]
   );
 
-  // Handle editor content change with auto-save
+  // Handle section select - scroll to section in editor
+  const handleSectionSelect = useCallback(
+    (sectionId: string, sectionName: string) => {
+      setSelectedSectionId(sectionId);
+
+      if (!editorRef.current) {
+        console.warn("Editor not available");
+        return;
+      }
+
+      // Find section in editor and scroll to it
+      const position = findSectionInEditor(editorRef.current, sectionName);
+      if (position !== null) {
+        try {
+          editorRef.current.commands.setTextSelection({
+            from: position,
+            to: position,
+          });
+          setTimeout(() => {
+            const domPos = editorRef.current.view.domAtPos(position);
+            if (domPos.node) {
+              const element =
+                domPos.node instanceof HTMLElement
+                  ? domPos.node
+                  : domPos.node.parentElement;
+              if (element) {
+                element.scrollIntoView({ behavior: "smooth", block: "center" });
+              }
+            }
+          }, 50);
+        } catch (error) {
+          console.error("Error scrolling to section:", error);
+        }
+      }
+    },
+    []
+  );
+
+  // Handle editor content change with auto-save (defined before handleNewSection)
   const handleEditorChange = useCallback(
     (tabId: string, content: string) => {
       const tab = tabs.find((t) => t.id === tabId);
@@ -257,6 +363,17 @@ function App() {
           t.id === tabId ? { ...t, content, isModified: true } : t
         )
       );
+
+      // Update sections when content changes
+      if (tab.filePath === MAIN_FILE_PATH) {
+        try {
+          const parsedSections = parseSectionsFromHTML(content);
+          setSections(parsedSections);
+        } catch (error) {
+          console.error("Error parsing sections:", error);
+          setSections([]);
+        }
+      }
 
       const existingTimeout = saveTimeouts.current.get(tabId);
       if (existingTimeout) {
@@ -279,9 +396,7 @@ function App() {
           await localStorageFS.writeFile(tab.filePath, contentToSave);
 
           setTabs((prev) =>
-            prev.map((t) =>
-              t.id === tabId ? { ...t, isModified: false } : t
-            )
+            prev.map((t) => (t.id === tabId ? { ...t, isModified: false } : t))
           );
 
           setLastSaved(new Date());
@@ -295,6 +410,67 @@ function App() {
       saveTimeouts.current.set(tabId, timeout);
     },
     [tabs]
+  );
+
+  // Handle new section creation
+  const handleNewSection = useCallback(
+    async (parentSectionId?: string, sectionName?: string) => {
+      const getMainTab = () => {
+        return (
+          tabs.find((t) => t.filePath === MAIN_FILE_PATH) ||
+          tabs.find((t) => t.id === activeTabId)
+        );
+      };
+
+      const addSectionToTab = (tab: TabData, name: string) => {
+        const content = tab.content || "";
+        const markdown = turndownService.current.turndown(content);
+        const newContent = addSectionToDocument(markdown, name, 2);
+        const htmlContent = marked.parse(newContent) as string;
+        handleEditorChange(tab.id, htmlContent);
+      };
+
+      if (sectionName) {
+        // Direct creation
+        const activeTab = getMainTab();
+        if (activeTab) {
+          addSectionToTab(activeTab, sectionName);
+        } else {
+          // Ensure main file is open first
+          await handleFileSelect(MAIN_FILE_PATH);
+          // Wait for tab to be created, then add section
+          setTimeout(() => {
+            const mainTab = getMainTab();
+            if (mainTab) {
+              addSectionToTab(mainTab, sectionName);
+            }
+          }, 200);
+        }
+        return;
+      }
+
+      // Show dialog
+      setInputDialog({
+        isOpen: true,
+        title: "New Section",
+        placeholder: "Enter section name",
+        onSubmit: async (finalSectionName: string) => {
+          const activeTab = getMainTab();
+          if (activeTab) {
+            addSectionToTab(activeTab, finalSectionName);
+          } else {
+            await handleFileSelect(MAIN_FILE_PATH);
+            setTimeout(() => {
+              const mainTab = getMainTab();
+              if (mainTab) {
+                addSectionToTab(mainTab, finalSectionName);
+              }
+            }, 200);
+          }
+        },
+      });
+    },
+    [tabs, activeTabId, handleFileSelect, handleEditorChange]
   );
 
   const handleEditorUpdate = useCallback(
@@ -369,9 +545,7 @@ function App() {
         const newPath = tab.filePath.replace(tab.fileName, newName);
         setTabs((prev) =>
           prev.map((t) =>
-            t.id === tabId
-              ? { ...t, fileName: newName, filePath: newPath }
-              : t
+            t.id === tabId ? { ...t, fileName: newName, filePath: newPath } : t
           )
         );
 
@@ -495,13 +669,18 @@ function App() {
         <Sidebar
           currentFolder={currentFolder}
           files={files}
-          selectedFileId={selectedFileId}
-          onFileSelect={handleFileSelect}
+          sections={sections}
+          selectedSectionId={selectedSectionId}
+          onSectionSelect={handleSectionSelect}
           onOpenFolder={handleOpenFolder}
-          onNewFile={handleNewFile}
-          onNewFolder={handleNewFolder}
+          onNewSection={handleNewSection}
           onRename={handleRename}
           onDelete={handleDelete}
+          // Legacy props
+          selectedFileId={selectedFileId}
+          onFileSelect={handleFileSelect}
+          onNewFile={handleNewFile}
+          onNewFolder={handleNewFolder}
         />
         <div className="flex overflow-hidden flex-col flex-1">
           <TabStrip
@@ -558,8 +737,16 @@ function App() {
           onInsertToEditor={handleChatInsert}
           onReplaceInEditor={handleChatReplace}
           editor={editorRef.current}
-          currentFilePath={activeTabId ? tabs.find(t => t.id === activeTabId)?.filePath : undefined}
-          currentFileName={activeTabId ? tabs.find(t => t.id === activeTabId)?.fileName : undefined}
+          currentFilePath={
+            activeTabId
+              ? tabs.find((t) => t.id === activeTabId)?.filePath
+              : undefined
+          }
+          currentFileName={
+            activeTabId
+              ? tabs.find((t) => t.id === activeTabId)?.fileName
+              : undefined
+          }
           workspacePath={currentFolder}
           cursorPosition={cursorPosition}
         />
@@ -612,4 +799,3 @@ function App() {
 }
 
 export default App;
-
