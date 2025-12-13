@@ -192,8 +192,8 @@ export function ChatPanel({
         currentContent = '';
       }
       
-      // Apply the patch
-      const newContent = applyPatch(currentContent, patch);
+      // Apply the patch - explicitly type patch to ensure compatibility
+      const newContent = applyPatch(currentContent, patch as Patch);
       
       console.log('✨ New content length:', newContent.length);
       console.log('📝 First 100 chars:', newContent.substring(0, 100));
