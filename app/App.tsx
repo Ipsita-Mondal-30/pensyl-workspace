@@ -664,7 +664,22 @@ function App() {
 
   return (
     <div className="w-full h-screen flex flex-col bg-[var(--bg-primary)] text-[var(--text-primary)] overflow-hidden">
-      <TopBar onOpenSettings={() => setIsSettingsOpen(true)} />
+      <TopBar
+        onOpenSettings={() => setIsSettingsOpen(true)}
+        onOpenAI={() => setIsChatCollapsed(false)}
+        onAddSource={(type) => {
+          console.log("Add source:", type);
+          // TODO: Implement source addition
+        }}
+        onCite={() => {
+          console.log("Cite");
+          // TODO: Implement citation
+        }}
+        onExport={(format) => {
+          console.log("Export:", format);
+          // TODO: Implement export
+        }}
+      />
       <div className="flex overflow-hidden flex-1">
         <Sidebar
           currentFolder={currentFolder}

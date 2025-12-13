@@ -105,6 +105,11 @@ export const Editor = forwardRef<any, EditorProps>(function Editor(
   const [caseSensitive, setCaseSensitive] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
+  // Floating toolbar state (Notion-style)
+  const [showFloatingToolbar, setShowFloatingToolbar] = useState(false);
+  const [toolbarPosition, setToolbarPosition] = useState({ top: 0, left: 0 });
+  const floatingToolbarRef = useRef<HTMLDivElement>(null);
+
   const editor = useEditor({
     immediatelyRender: false, // Required for SSR/Next.js to avoid hydration mismatches
     extensions: [
@@ -191,6 +196,54 @@ export const Editor = forwardRef<any, EditorProps>(function Editor(
 
   // Expose editor instance to parent via ref
   useImperativeHandle(ref, () => editor, [editor]);
+
+  // Handle floating toolbar on text selection (Notion-style)
+  useEffect(() => {
+    if (!editor || !editable || !editorContentRef.current) return;
+
+    const updateToolbar = () => {
+      const { state } = editor.view;
+      const { selection } = state;
+      const { from, to } = selection;
+
+      // Only show toolbar if there's a selection (not just cursor)
+      if (from !== to) {
+        try {
+          const start = editor.view.coordsAtPos(from);
+          const end = editor.view.coordsAtPos(to);
+          
+          // Get editor container position
+          const editorRect = editorContentRef.current.getBoundingClientRect();
+          
+          // Position toolbar above selection, centered
+          const top = Math.min(start.top, end.top) - 10 + window.scrollY;
+          const left = (start.left + end.left) / 2 + window.scrollX;
+          
+          setToolbarPosition({ top, left });
+          setShowFloatingToolbar(true);
+        } catch (error) {
+          setShowFloatingToolbar(false);
+        }
+      } else {
+        setShowFloatingToolbar(false);
+      }
+    };
+
+    editor.on("selectionUpdate", updateToolbar);
+    editor.on("transaction", updateToolbar);
+
+    // Also listen to mouseup for selection changes
+    const handleMouseUp = () => {
+      setTimeout(updateToolbar, 10);
+    };
+    document.addEventListener("mouseup", handleMouseUp);
+
+    return () => {
+      editor.off("selectionUpdate", updateToolbar);
+      editor.off("transaction", updateToolbar);
+      document.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [editor, editable]);
 
   // Track cursor position and line count based on visual lines
   useEffect(() => {
@@ -708,271 +761,90 @@ export const Editor = forwardRef<any, EditorProps>(function Editor(
   };
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-[var(--bg-primary)]">
-      {/* Always Visible Toolbar */}
-      {editable && (
-        <div className="flex items-center gap-1 px-3 py-2.5 border-b border-[var(--border-primary)] bg-[var(--bg-secondary)] flex-wrap">
-          {/* Text Formatting */}
-          <div className="flex gap-1 items-center">
+    <div className="flex-1 flex flex-col overflow-hidden bg-[var(--bg-primary)] relative">
+      {/* Floating Toolbar (Notion-style) - appears on text selection */}
+      {editable && showFloatingToolbar && (
+        <div
+          ref={floatingToolbarRef}
+          className="fixed z-50 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg shadow-xl px-2 py-1.5 flex items-center gap-1"
+          style={{
+            top: `${toolbarPosition.top}px`,
+            left: `${toolbarPosition.left}px`,
+            transform: "translate(-50%, -100%)",
+          }}
+        >
+          {/* Bold */}
             <ToolbarButton
-              onClick={() => editor.chain().focus().toggleBold().run()}
+            onClick={() => {
+              editor.chain().focus().toggleBold().run();
+              setShowFloatingToolbar(false);
+            }}
               isActive={editor.isActive("bold")}
-              title="Bold (⌘B / Ctrl+B)"
+            title="Bold (⌘B)"
             >
-              <strong className="font-bold">B</strong>
+            <strong className="font-bold text-sm">B</strong>
             </ToolbarButton>
+
+          {/* Italic */}
             <ToolbarButton
-              onClick={() => editor.chain().focus().toggleItalic().run()}
+            onClick={() => {
+              editor.chain().focus().toggleItalic().run();
+              setShowFloatingToolbar(false);
+            }}
               isActive={editor.isActive("italic")}
-              title="Italic (⌘I / Ctrl+I)"
+            title="Italic (⌘I)"
             >
-              <em className="italic">I</em>
+            <em className="italic text-sm">I</em>
             </ToolbarButton>
+
+          {/* Underline */}
             <ToolbarButton
-              onClick={() => editor.chain().focus().toggleUnderline().run()}
+            onClick={() => {
+              editor.chain().focus().toggleUnderline().run();
+              setShowFloatingToolbar(false);
+            }}
               isActive={editor.isActive("underline")}
-              title="Underline (⌘U / Ctrl+U)"
+            title="Underline (⌘U)"
             >
-              <u>U</u>
+            <u className="text-sm">U</u>
             </ToolbarButton>
+
+          {/* Strikethrough */}
             <ToolbarButton
-              onClick={() => editor.chain().focus().toggleStrike().run()}
+            onClick={() => {
+              editor.chain().focus().toggleStrike().run();
+              setShowFloatingToolbar(false);
+            }}
               isActive={editor.isActive("strike")}
               title="Strikethrough"
             >
-              <s>S</s>
+            <s className="text-sm">S</s>
             </ToolbarButton>
+
+          {/* Code */}
             <ToolbarButton
-              onClick={() => editor.chain().focus().toggleCode().run()}
+            onClick={() => {
+              editor.chain().focus().toggleCode().run();
+              setShowFloatingToolbar(false);
+            }}
               isActive={editor.isActive("code")}
-              title="Inline Code"
+            title="Code"
             >
-              {"</>"}
+            <span className="text-xs font-mono">&lt;/&gt;</span>
             </ToolbarButton>
-            <ToolbarButton
-              onClick={() => editor.chain().focus().toggleHighlight().run()}
-              isActive={editor.isActive("highlight")}
-              title="Highlight"
-            >
-              <span className="px-1 text-xs text-black bg-yellow-400 rounded">
-                H
-              </span>
-            </ToolbarButton>
-            <ToolbarButton
-              onClick={() => editor.chain().focus().toggleSubscript().run()}
-              isActive={editor.isActive("subscript")}
-              title="Subscript"
-            >
-              <span className="text-xs">x₂</span>
-            </ToolbarButton>
-            <ToolbarButton
-              onClick={() => editor.chain().focus().toggleSuperscript().run()}
-              isActive={editor.isActive("superscript")}
-              title="Superscript"
-            >
-              <span className="text-xs">x²</span>
-            </ToolbarButton>
-          </div>
 
           <ToolbarSeparator />
 
-          {/* Headings */}
-          <div className="flex gap-1 items-center">
+          {/* Link */}
             <ToolbarButton
-              onClick={() =>
-                editor.chain().focus().toggleHeading({ level: 1 }).run()
-              }
-              isActive={editor.isActive("heading", { level: 1 })}
-              title="Heading 1"
-            >
-              <span className="font-bold">H1</span>
-            </ToolbarButton>
-            <ToolbarButton
-              onClick={() =>
-                editor.chain().focus().toggleHeading({ level: 2 }).run()
-              }
-              isActive={editor.isActive("heading", { level: 2 })}
-              title="Heading 2"
-            >
-              <span className="font-semibold">H2</span>
-            </ToolbarButton>
-            <ToolbarButton
-              onClick={() =>
-                editor.chain().focus().toggleHeading({ level: 3 }).run()
-              }
-              isActive={editor.isActive("heading", { level: 3 })}
-              title="Heading 3"
-            >
-              <span className="font-medium">H3</span>
-            </ToolbarButton>
-            <ToolbarButton
-              onClick={() => editor.chain().focus().setParagraph().run()}
-              isActive={editor.isActive("paragraph")}
-              title="Paragraph"
-            >
-              P
-            </ToolbarButton>
-          </div>
-
-          <ToolbarSeparator />
-
-          {/* Lists */}
-          <div className="flex gap-1 items-center">
-            <ToolbarButton
-              onClick={() => editor.chain().focus().toggleBulletList().run()}
-              isActive={editor.isActive("bulletList")}
-              title="Bullet List"
-            >
-              <span className="text-lg">•</span>
-            </ToolbarButton>
-            <ToolbarButton
-              onClick={() => editor.chain().focus().toggleOrderedList().run()}
-              isActive={editor.isActive("orderedList")}
-              title="Numbered List"
-            >
-              <span>1.</span>
-            </ToolbarButton>
-            <ToolbarButton
-              onClick={() => editor.chain().focus().toggleTaskList().run()}
-              isActive={editor.isActive("taskList")}
-              title="Task List"
-            >
-              <span className="text-sm">☐</span>
-            </ToolbarButton>
-          </div>
-
-          <ToolbarSeparator />
-
-          {/* Text Alignment */}
-          <div className="flex gap-1 items-center">
-            <ToolbarButton
-              onClick={() => editor.chain().focus().setTextAlign("left").run()}
-              isActive={editor.isActive({ textAlign: "left" })}
-              title="Align Left"
-            >
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 16 16"
-                fill="none"
-                className="w-4 h-4"
-              >
-                <path
-                  d="M2 4H14M2 8H10M2 12H14"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                />
-              </svg>
-            </ToolbarButton>
-            <ToolbarButton
-              onClick={() =>
-                editor.chain().focus().setTextAlign("center").run()
-              }
-              isActive={editor.isActive({ textAlign: "center" })}
-              title="Align Center"
-            >
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 16 16"
-                fill="none"
-                className="w-4 h-4"
-              >
-                <path
-                  d="M3 4H13M4 8H12M3 12H13"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                />
-              </svg>
-            </ToolbarButton>
-            <ToolbarButton
-              onClick={() => editor.chain().focus().setTextAlign("right").run()}
-              isActive={editor.isActive({ textAlign: "right" })}
-              title="Align Right"
-            >
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 16 16"
-                fill="none"
-                className="w-4 h-4"
-              >
-                <path
-                  d="M2 4H14M6 8H14M2 12H14"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                />
-              </svg>
-            </ToolbarButton>
-            <ToolbarButton
-              onClick={() =>
-                editor.chain().focus().setTextAlign("justify").run()
-              }
-              isActive={editor.isActive({ textAlign: "justify" })}
-              title="Justify"
-            >
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 16 16"
-                fill="none"
-                className="w-4 h-4"
-              >
-                <path
-                  d="M2 4H14M2 8H14M2 12H14"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                />
-              </svg>
-            </ToolbarButton>
-          </div>
-
-          <ToolbarSeparator />
-
-          {/* Block Elements */}
-          <div className="flex gap-1 items-center">
-            <ToolbarButton
-              onClick={() => editor.chain().focus().toggleCodeBlock().run()}
-              isActive={editor.isActive("codeBlock")}
-              title="Code Block"
-            >
-              {"{}"}
-            </ToolbarButton>
-            <ToolbarButton
-              onClick={() => editor.chain().focus().toggleBlockquote().run()}
-              isActive={editor.isActive("blockquote")}
-              title="Blockquote"
-            >
-              <span className="text-lg">"</span>
-            </ToolbarButton>
-            <ToolbarButton
-              onClick={() => editor.chain().focus().setHorizontalRule().run()}
-              title="Horizontal Rule"
-            >
-              ─
-            </ToolbarButton>
-          </div>
-
-          <ToolbarSeparator />
-
-          {/* Links & Media */}
-          <div className="flex gap-1 items-center">
-            <ToolbarButton
-              onClick={handleAddLink}
+            onClick={() => {
+              handleAddLink();
+              setShowFloatingToolbar(false);
+            }}
               isActive={editor.isActive("link")}
-              title="Insert Link"
-            >
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 16 16"
-                fill="none"
-                className="w-4 h-4"
-              >
+            title="Add Link"
+          >
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
                 <path
                   d="M6.5 8.5C6.5 7.11929 7.61929 6 9 6H10.5C11.8807 6 13 7.11929 13 8.5C13 9.88071 11.8807 11 10.5 11H9C7.61929 11 6.5 9.88071 6.5 8.5Z"
                   stroke="currentColor"
@@ -991,200 +863,56 @@ export const Editor = forwardRef<any, EditorProps>(function Editor(
                 />
               </svg>
             </ToolbarButton>
-            <ToolbarButton onClick={handleAddImage} title="Insert Image">
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 16 16"
-                fill="none"
-                className="w-4 h-4"
-              >
-                <rect
-                  x="2"
-                  y="3"
-                  width="12"
-                  height="10"
-                  rx="1"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                />
-                <circle cx="5.5" cy="7.5" r="1.5" fill="currentColor" />
-                <path
-                  d="M2 10L5.5 6.5L9 10L13 6L14 7V12H2V10Z"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
+
+          {/* Highlight */}
+          <ToolbarButton
+            onClick={() => {
+              editor.chain().focus().toggleHighlight().run();
+              setShowFloatingToolbar(false);
+            }}
+            isActive={editor.isActive("highlight")}
+            title="Highlight"
+          >
+            <span className="px-1 text-xs text-black bg-yellow-400 rounded">H</span>
             </ToolbarButton>
-            <ToolbarButton onClick={handleAddTable} title="Insert Table">
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 16 16"
-                fill="none"
-                className="w-4 h-4"
-              >
-                <rect
-                  x="2"
-                  y="2"
-                  width="12"
-                  height="12"
-                  rx="1"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                />
-                <path
-                  d="M6 2V14M10 2V14M2 6H14M2 10H14"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                />
-              </svg>
-            </ToolbarButton>
-          </div>
 
           <ToolbarSeparator />
 
-          {/* Table Controls (only show when in table) */}
-          {editor.isActive("table") && (
-            <>
-              <div className="flex gap-1 items-center">
+          {/* Heading 1 */}
                 <ToolbarButton
-                  onClick={() => editor.chain().focus().addColumnBefore().run()}
-                  title="Add Column Before"
-                >
-                  <span className="text-xs">+Col←</span>
+            onClick={() => {
+              editor.chain().focus().toggleHeading({ level: 1 }).run();
+              setShowFloatingToolbar(false);
+            }}
+            isActive={editor.isActive("heading", { level: 1 })}
+            title="Heading 1"
+          >
+            <span className="text-xs font-bold">H1</span>
                 </ToolbarButton>
-                <ToolbarButton
-                  onClick={() => editor.chain().focus().addColumnAfter().run()}
-                  title="Add Column After"
-                >
-                  <span className="text-xs">+Col→</span>
-                </ToolbarButton>
-                <ToolbarButton
-                  onClick={() => editor.chain().focus().deleteColumn().run()}
-                  title="Delete Column"
-                >
-                  <span className="text-xs">-Col</span>
-                </ToolbarButton>
-                <ToolbarButton
-                  onClick={() => editor.chain().focus().addRowBefore().run()}
-                  title="Add Row Before"
-                >
-                  <span className="text-xs">+Row↑</span>
-                </ToolbarButton>
-                <ToolbarButton
-                  onClick={() => editor.chain().focus().addRowAfter().run()}
-                  title="Add Row After"
-                >
-                  <span className="text-xs">+Row↓</span>
-                </ToolbarButton>
-                <ToolbarButton
-                  onClick={() => editor.chain().focus().deleteRow().run()}
-                  title="Delete Row"
-                >
-                  <span className="text-xs">-Row</span>
-                </ToolbarButton>
-                <ToolbarButton
-                  onClick={() => editor.chain().focus().deleteTable().run()}
-                  title="Delete Table"
-                >
-                  <span className="text-xs">×Table</span>
-                </ToolbarButton>
-                <ToolbarButton
-                  onClick={() =>
-                    editor.chain().focus().toggleHeaderColumn().run()
-                  }
-                  isActive={editor.isActive("tableHeader")}
-                  title="Toggle Header Column"
-                >
-                  <span className="text-xs">H</span>
-                </ToolbarButton>
-                <ToolbarButton
-                  onClick={() => editor.chain().focus().toggleHeaderRow().run()}
-                  title="Toggle Header Row"
-                >
-                  <span className="text-xs">H</span>
-                </ToolbarButton>
-              </div>
-              <ToolbarSeparator />
-            </>
-          )}
 
-          {/* Color Picker */}
-          <div className="flex gap-1 items-center">
-            <input
-              type="color"
-              onChange={(e) =>
-                editor.chain().focus().setColor(e.target.value).run()
-              }
-              value={editor.getAttributes("textStyle").color || "#cccccc"}
-              className="w-8 h-8 rounded border border-[var(--border-primary)] cursor-pointer"
-              title="Text Color"
-            />
-            <input
-              type="color"
-              onChange={(e) =>
-                editor
-                  .chain()
-                  .focus()
-                  .toggleHighlight({ color: e.target.value })
-                  .run()
-              }
-              value="#fef08a"
-              className="w-8 h-8 rounded border border-[var(--border-primary)] cursor-pointer"
-              title="Highlight Color"
-            />
-          </div>
+          {/* Heading 2 */}
+                <ToolbarButton
+            onClick={() => {
+              editor.chain().focus().toggleHeading({ level: 2 }).run();
+              setShowFloatingToolbar(false);
+            }}
+            isActive={editor.isActive("heading", { level: 2 })}
+            title="Heading 2"
+          >
+            <span className="text-xs font-semibold">H2</span>
+                </ToolbarButton>
 
-          <ToolbarSeparator />
-
-          {/* Undo/Redo */}
-          <div className="flex gap-1 items-center">
+          {/* Heading 3 */}
             <ToolbarButton
-              onClick={() => editor.chain().focus().undo().run()}
-              disabled={!editor.can().undo()}
-              title="Undo (⌘Z / Ctrl+Z)"
-            >
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 16 16"
-                fill="none"
-                className="w-4 h-4"
-              >
-                <path
-                  d="M3 8C3 5.23858 5.23858 3 8 3H11M3 8L6 5M3 8L6 11"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
+            onClick={() => {
+              editor.chain().focus().toggleHeading({ level: 3 }).run();
+              setShowFloatingToolbar(false);
+            }}
+            isActive={editor.isActive("heading", { level: 3 })}
+            title="Heading 3"
+          >
+            <span className="text-xs font-medium">H3</span>
             </ToolbarButton>
-            <ToolbarButton
-              onClick={() => editor.chain().focus().redo().run()}
-              disabled={!editor.can().redo()}
-              title="Redo (⌘⇧Z / Ctrl+Shift+Z)"
-            >
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 16 16"
-                fill="none"
-                className="w-4 h-4"
-              >
-                <path
-                  d="M13 8C13 10.7614 10.7614 13 8 13H5M13 8L10 5M13 8L10 11"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </ToolbarButton>
-          </div>
         </div>
       )}
 

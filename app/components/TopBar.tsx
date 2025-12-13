@@ -1,234 +1,492 @@
 "use client";
-import { useState, useEffect } from "react";
-
-// Icon Components
-const AppIcon = () => (
-  <svg
-    width="20"
-    height="20"
-    viewBox="0 0 20 20"
-    fill="none"
-    aria-hidden="true"
-  >
-    <rect
-      x="2"
-      y="2"
-      width="16"
-      height="16"
-      rx="3"
-      stroke="currentColor"
-      strokeWidth="2"
-    />
-    <path
-      d="M6 10L9 13L14 7"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  </svg>
-);
-
-const SearchIcon = () => (
-  <svg
-    className="text-[var(--text-tertiary)] shrink-0"
-    width="14"
-    height="14"
-    viewBox="0 0 14 14"
-    fill="none"
-    aria-hidden="true"
-  >
-    <circle cx="6" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.5" />
-    <path
-      d="M9 9L12 12"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-    />
-  </svg>
-);
-
-const MinimizeIcon = () => (
-  <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
-    <path
-      d="M2 6H10"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-    />
-  </svg>
-);
-
-const MaximizeIcon = () => (
-  <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
-    <rect
-      x="2"
-      y="2"
-      width="8"
-      height="8"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      fill="none"
-    />
-  </svg>
-);
-
-const RestoreIcon = () => (
-  <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
-    <rect
-      x="2"
-      y="3"
-      width="7"
-      height="7"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      fill="none"
-    />
-    <rect
-      x="3"
-      y="2"
-      width="7"
-      height="7"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      fill="none"
-    />
-  </svg>
-);
-
-const CloseIcon = () => (
-  <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
-    <path
-      d="M3 3L9 9M9 3L3 9"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-    />
-  </svg>
-);
+import { useState, useRef, useEffect } from "react";
 
 interface TopBarProps {
   onOpenSettings?: () => void;
+  onOpenAI?: () => void;
+  onAddSource?: (type: "pdf" | "doi" | "zotero") => void;
+  onCite?: () => void;
+  onExport?: (format: "pdf" | "docx" | "latex" | "markdown") => void;
 }
 
-
-
-
-
-
-
 /**
- * TopBar component - Custom title bar with app branding, search, and window controls
+ * TopBar component - Research-focused toolbar with core features
  */
-export function TopBar({ onOpenSettings }: TopBarProps = {}) {
-  const [searchValue, setSearchValue] = useState("");
-  const [isMac, setIsMac] = useState(false);
+export function TopBar({
+  onOpenSettings,
+  onOpenAI,
+  onAddSource,
+  onCite,
+  onExport,
+}: TopBarProps = {}) {
+  const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+  const dropdownRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
 
-  // Safely detect platform with fallback (client-side only)
+  // Close dropdowns when clicking outside
   useEffect(() => {
-    if (typeof window !== "undefined" && typeof navigator !== "undefined") {
-      try {
-        // Try to use exposed platform API
-        if ((window as any).platform) {
-          setIsMac((window as any).platform.isMac === true);
-        } else {
-          // Fallback: detect from user agent
-          setIsMac(navigator.platform.toUpperCase().indexOf("MAC") >= 0);
+    const handleClickOutside = (event: MouseEvent) => {
+      if (openDropdown) {
+        const dropdown = dropdownRefs.current[openDropdown];
+        if (dropdown && !dropdown.contains(event.target as Node)) {
+          setOpenDropdown(null);
         }
-      } catch (error) {
-        setIsMac(false);
       }
-    }
-  }, []);
+    };
 
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [openDropdown]);
+
+  const toggleDropdown = (id: string) => {
+    setOpenDropdown(openDropdown === id ? null : id);
+  };
+
+  const TopBarButton = ({
+    id,
+    label,
+    icon,
+    onClick,
+    hasDropdown = false,
+    children,
+  }: {
+    id: string;
+    label: string;
+    icon: React.ReactNode;
+    onClick?: () => void;
+    hasDropdown?: boolean;
+    children?: React.ReactNode;
+  }) => (
+    <div className="relative">
+      <button
+        onClick={() => {
+          if (hasDropdown) {
+            toggleDropdown(id);
+          } else {
+            onClick?.();
+          }
+        }}
+        className={`
+          flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium
+          transition-all duration-150
+          ${
+            openDropdown === id
+              ? "bg-[var(--bg-active)] text-[var(--text-primary)]"
+              : "text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
+          }
+        `}
+      >
+        {icon}
+        <span>{label}</span>
+        {hasDropdown && (
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 12 12"
+            fill="none"
+            className={`transition-transform duration-150 ${
+              openDropdown === id ? "rotate-180" : ""
+            }`}
+          >
+            <path
+              d="M3 4.5L6 7.5L9 4.5"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        )}
+      </button>
+      {hasDropdown && openDropdown === id && children && (
+        <div
+          ref={(el) => {
+            dropdownRefs.current[id] = el;
+          }}
+          className="absolute top-full left-0 mt-1 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg shadow-xl py-1.5 min-w-[200px] z-50"
+        >
+          {children}
+        </div>
+      )}
+    </div>
+  );
+
+  const DropdownItem = ({
+    icon,
+    label,
+    onClick,
+    shortcut,
+  }: {
+    icon?: React.ReactNode;
+    label: string;
+    onClick: () => void;
+    shortcut?: string;
+  }) => (
+    <button
+      onClick={() => {
+        onClick();
+        setOpenDropdown(null);
+      }}
+      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors text-left"
+    >
+      {icon && (
+        <span className="w-4 h-4 flex items-center justify-center">{icon}</span>
+      )}
+      <span className="flex-1">{label}</span>
+      {shortcut && (
+        <span className="text-xs text-[var(--text-tertiary)] font-mono">
+          {shortcut}
+        </span>
+      )}
+    </button>
+  );
 
   return (
-    <div
-      className="flex items-center justify-between h-10 bg-[var(--bg-secondary)] border-b border-[var(--border-primary)] px-2 select-none drag-region"
-      style={{ paddingLeft: isMac ? "78px" : "8px" }}
-    >
-      {/* Left: App branding - Only show if not Mac (Mac has system controls on left) */}
-      {!isMac && (
-        <div className="flex items-center gap-2 min-w-[200px] [&>*]:no-drag">
-          <div
-            className="flex items-center justify-center w-5 h-5 text-[var(--accent-primary)]"
-            aria-hidden="true"
-          >
-            <AppIcon />
-          </div>
-          <span className="text-[13px] font-semibold text-[var(--text-primary)] tracking-tight">
-            Intellirite
-          </span>
-        </div>
-      )}
-
-      {/* Mac: Show app branding in center-left area (after system controls) */}
-      {isMac && (
-        <div className="flex items-center gap-2 [&>*]:no-drag">
-          <div
-            className="flex items-center justify-center w-5 h-5 text-[var(--accent-primary)]"
-            aria-hidden="true"
-          >
-            <AppIcon />
-          </div>
-          <span className="text-[13px] font-semibold text-[var(--text-primary)] tracking-tight">
-            Intellirite
-          </span>
-        </div>
-      )}
-
-      {/* Middle: Search input */}
-      <div className="flex-1 flex justify-center max-w-[600px] mx-auto [&>*]:no-drag">
-        <div className="flex items-center gap-2 w-full max-w-[400px] h-7 px-3 bg-[var(--bg-tertiary)] border border-[var(--border-secondary)] rounded-md transition-all duration-100 focus-within:bg-[var(--bg-primary)] focus-within:border-[var(--accent-primary)] focus-within:shadow-[0_0_0_1px_var(--accent-primary)]">
-          <SearchIcon />
-          <input
-            type="text"
-            className="flex-1 text-xs text-[var(--text-primary)] bg-transparent border-none outline-none p-0 placeholder:text-[var(--text-tertiary)]"
-            placeholder="Search..."
-            value={searchValue}
-            onChange={(e) => setSearchValue(e.target.value)}
-            aria-label="Search"
-          />
-        </div>
-      </div>
-
-      {/* Right: Settings Button and Window Controls */}
-      <div className="flex items-center gap-2 min-w-[200px] justify-end [&>*]:no-drag">
-        {/* Settings Button */}
-        {onOpenSettings && (
-          <button
-            onClick={onOpenSettings}
-            className="flex items-center justify-center w-8 h-8 text-[var(--text-secondary)] bg-transparent border-none cursor-pointer transition-all duration-100 rounded hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] active:bg-[var(--bg-active)]"
-            aria-label="Settings"
-            title="Settings"
-            type="button"
-          >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 16 16"
-              fill="none"
-              className="w-4 h-4"
-            >
+    <div className="flex items-center justify-between h-11 bg-[var(--bg-secondary)] border-b border-[var(--border-primary)] px-4 select-none">
+      {/* Left: Core Features */}
+      <div className="flex items-center gap-1">
+        {/* 1. Add Source */}
+        <TopBarButton
+          id="add-source"
+          label="Add Source"
+          icon={
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
               <path
-                d="M8 10C9.10457 10 10 9.10457 10 8C10 6.89543 9.10457 6 8 6C6.89543 6 6 6.89543 6 8C6 9.10457 6.89543 10 8 10Z"
+                d="M8 3V13M3 8H13"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+              />
+            </svg>
+          }
+          hasDropdown={true}
+        >
+          <DropdownItem
+            icon="📄"
+            label="Upload PDF"
+            onClick={() => onAddSource?.("pdf")}
+          />
+          <DropdownItem
+            icon="🔗"
+            label="Add via DOI / BibTeX"
+            onClick={() => onAddSource?.("doi")}
+          />
+          <DropdownItem
+            icon="📚"
+            label="Import from Zotero / Mendeley"
+            onClick={() => onAddSource?.("zotero")}
+          />
+        </TopBarButton>
+
+        {/* 2. Cite */}
+        <TopBarButton
+          id="cite"
+          label="Cite"
+          icon={
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path
+                d="M4 6C4 4.89543 4.89543 4 6 4H10C11.1046 4 12 4.89543 12 6V10C12 11.1046 11.1046 12 10 12H6C4.89543 12 4 11.1046 4 10V6Z"
+                stroke="currentColor"
+                strokeWidth="1.5"
+              />
+            </svg>
+          }
+          hasDropdown={true}
+        >
+          <DropdownItem
+            label="Insert in-text citation at cursor"
+            onClick={() => onCite?.()}
+            shortcut="⌘⇧C"
+          />
+          <DropdownItem label="Search existing references" onClick={() => {}} />
+          <div className="border-t border-[var(--border-primary)] my-1" />
+          <DropdownItem label="APA Format" onClick={() => {}} />
+          <DropdownItem label="IEEE Format" onClick={() => {}} />
+          <DropdownItem label="MLA Format" onClick={() => {}} />
+        </TopBarButton>
+
+        {/* 3. Ask AI */}
+        <TopBarButton
+          id="ask-ai"
+          label="Ask AI"
+          icon={
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path
+                d="M8 2C4.68629 2 2 4.68629 2 8C2 11.3137 4.68629 14 8 14C11.3137 14 14 11.3137 14 8C14 4.68629 11.3137 2 8 2Z"
+                stroke="currentColor"
+                strokeWidth="1.5"
+              />
+              <path
+                d="M8 5V8M8 11H8.01"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+              />
+            </svg>
+          }
+          hasDropdown={true}
+          onClick={onOpenAI}
+        >
+          <DropdownItem label="Rewrite section" onClick={() => {}} />
+          <DropdownItem label="Explain concept" onClick={() => {}} />
+          <DropdownItem label="Improve clarity" onClick={() => {}} />
+          <DropdownItem label="Reviewer feedback" onClick={() => {}} />
+        </TopBarButton>
+
+        {/* 4. Research Tools */}
+        <TopBarButton
+          id="research"
+          label="Research"
+          icon={
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <circle
+                cx="7"
+                cy="7"
+                r="4.5"
+                stroke="currentColor"
+                strokeWidth="1.5"
+              />
+              <path
+                d="M10 10L13 13"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+              />
+            </svg>
+          }
+          hasDropdown={true}
+        >
+          <DropdownItem
+            label="Search papers (Semantic Scholar)"
+            onClick={() => {}}
+          />
+          <DropdownItem label="Search arXiv" onClick={() => {}} />
+          <DropdownItem label="Related work suggestions" onClick={() => {}} />
+          <DropdownItem label="PDF summaries" onClick={() => {}} />
+          <DropdownItem label="Key quote extraction" onClick={() => {}} />
+        </TopBarButton>
+
+        {/* 5. Listen */}
+        <TopBarButton
+          id="listen"
+          label="Listen"
+          icon={
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path
+                d="M8 2V6M8 10V14M8 6C9.10457 6 10 6.89543 10 8C10 9.10457 9.10457 10 8 10C6.89543 10 6 9.10457 6 8C6 6.89543 6.89543 6 8 6Z"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+              />
+            </svg>
+          }
+          onClick={() => {
+            // Toggle audio playback
+          }}
+        />
+
+        {/* 6. Humanize - Auto-Format Everything */}
+        <TopBarButton
+          id="humanize"
+          label="Humanize"
+          icon={
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path
+                d="M8 2C4.68629 2 2 4.68629 2 8C2 11.3137 4.68629 14 8 14C11.3137 14 14 11.3137 14 8C14 4.68629 11.3137 2 8 2Z"
+                stroke="currentColor"
+                strokeWidth="1.5"
+              />
+              <path
+                d="M5.5 6.5C5.5 7.05228 5.94772 7.5 6.5 7.5C7.05228 7.5 7.5 7.05228 7.5 6.5C7.5 5.94772 7.05228 5.5 6.5 5.5C5.94772 5.5 5.5 5.94772 5.5 6.5Z"
+                fill="currentColor"
+              />
+              <path
+                d="M8.5 6.5C8.5 7.05228 8.94772 7.5 9.5 7.5C10.0523 7.5 10.5 7.05228 10.5 6.5C10.5 5.94772 10.0523 5.5 9.5 5.5C8.94772 5.5 8.5 5.94772 8.5 6.5Z"
+                fill="currentColor"
+              />
+              <path
+                d="M6 10C6 10 7 11.5 8 11.5C9 11.5 10 10 10 10"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+              />
+            </svg>
+          }
+          hasDropdown={true}
+        >
+          <DropdownItem label="Fix formatting everywhere" onClick={() => {}} />
+          <DropdownItem label="Match journal style" onClick={() => {}} />
+          <DropdownItem label="Normalize citations" onClick={() => {}} />
+          <DropdownItem label="Fix headings & numbering" onClick={() => {}} />
+        </TopBarButton>
+
+        {/* 7. Research Gap Finder */}
+        <TopBarButton
+          id="find-gaps"
+          label="Find Gaps"
+          icon={
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path
+                d="M8 2L10.5 6L15 7L11.5 10.5L12 15L8 12.5L4 15L4.5 10.5L1 7L5.5 6L8 2Z"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <circle
+                cx="8"
+                cy="8"
+                r="2"
+                stroke="currentColor"
+                strokeWidth="1.5"
+              />
+            </svg>
+          }
+          onClick={() => {
+            // Research Gap Finder action
+            console.log("Find research gaps");
+          }}
+        />
+
+        {/* 8. LaTeX */}
+        <TopBarButton
+          id="latex"
+          label="LaTeX"
+          icon={
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path
+                d="M4 4L8 8L12 4M4 12L8 8L12 12"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          }
+          hasDropdown={true}
+        >
+          <DropdownItem label="Toggle LaTeX view" onClick={() => {}} />
+          <DropdownItem label="Export to LaTeX" onClick={() => {}} />
+          <DropdownItem label="Copy LaTeX snippet" onClick={() => {}} />
+          <DropdownItem label="Math blocks manager" onClick={() => {}} />
+        </TopBarButton>
+
+        {/* 9. Export */}
+        <TopBarButton
+          id="export"
+          label="Export"
+          icon={
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path
+                d="M8 2V10M8 10L5 7M8 10L11 7"
                 stroke="currentColor"
                 strokeWidth="1.5"
                 strokeLinecap="round"
                 strokeLinejoin="round"
               />
               <path
-                d="M12.5 8C12.5 7.5 12.7 7.1 12.9 6.8L13.7 5.6C13.9 5.3 13.9 4.9 13.7 4.6L12.1 2.4C11.9 2.1 11.5 2.1 11.2 2.3L10 3.1C9.7 2.9 9.3 2.7 8.8 2.7H7.2C6.7 2.7 6.3 2.9 6 3.1L4.8 2.3C4.5 2.1 4.1 2.1 3.8 2.3L2.2 4.5C2 4.8 2 5.2 2.2 5.5L3 6.7C3.3 7 3.3 7.4 3.1 7.7L2.3 8.9C2.1 9.2 2.1 9.6 2.3 9.9L3.9 12.1C4.1 12.4 4.5 12.4 4.8 12.2L6 11.4C6.3 11.6 6.7 11.8 7.2 11.8H8.8C9.3 11.8 9.7 11.6 10 11.4L11.2 12.2C11.5 12.4 11.9 12.4 12.2 12.2L13.8 10C14 9.7 14 9.3 13.8 9L13 7.8C12.7 7.5 12.5 7.1 12.5 6.6V8Z"
+                d="M2 12V13C2 14.1046 2.89543 15 4 15H12C13.1046 15 14 14.1046 14 13V12"
                 stroke="currentColor"
-                strokeWidth="1.2"
+                strokeWidth="1.5"
                 strokeLinecap="round"
-                strokeLinejoin="round"
               />
             </svg>
-          </button>
-        )}
+          }
+          hasDropdown={true}
+        >
+          <DropdownItem
+            label="PDF (submission-ready)"
+            onClick={() => onExport?.("pdf")}
+          />
+          <DropdownItem label="DOCX" onClick={() => onExport?.("docx")} />
+          <DropdownItem label="LaTeX" onClick={() => onExport?.("latex")} />
+          <DropdownItem
+            label="Markdown"
+            onClick={() => onExport?.("markdown")}
+          />
+        </TopBarButton>
+      </div>
 
-        {/* Window Controls - Hidden in web version */}
+      {/* Right: Optional Icons */}
+      <div className="flex items-center gap-2">
+        {/* Version History */}
+        <button
+          className="w-8 h-8 flex items-center justify-center text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] rounded transition-colors"
+          title="Version history"
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path
+              d="M8 3C5.23858 3 3 5.23858 3 8C3 10.7614 5.23858 13 8 13C10.7614 13 13 10.7614 13 8"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+            />
+            <path
+              d="M8 5V8L10 10"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </button>
+
+        {/* Collaborators */}
+        <button
+          className="w-8 h-8 flex items-center justify-center text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] rounded transition-colors"
+          title="Collaborators"
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <circle
+              cx="6"
+              cy="5"
+              r="2"
+              stroke="currentColor"
+              strokeWidth="1.5"
+            />
+            <path
+              d="M2 13C2 11.3431 3.34315 10 5 10H7C8.65685 10 10 11.3431 10 13"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+            />
+            <circle
+              cx="11"
+              cy="6"
+              r="2"
+              stroke="currentColor"
+              strokeWidth="1.5"
+            />
+            <path
+              d="M13 12C13 10.8954 12.1046 10 11 10H9C7.89543 10 7 10.8954 7 12"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+            />
+          </svg>
+        </button>
+
+        {/* Settings */}
+        <button
+          onClick={onOpenSettings}
+          className="w-8 h-8 flex items-center justify-center text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] rounded transition-colors"
+          title="Project settings"
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <circle
+              cx="8"
+              cy="8"
+              r="2"
+              stroke="currentColor"
+              strokeWidth="1.5"
+            />
+            <path
+              d="M8 2V4M8 12V14M14 8H12M4 8H2M12.5 3.5L11 5M5 11L3.5 12.5M12.5 12.5L11 11M5 5L3.5 3.5"
+              stroke="currentColor"
+              strokeWidth="1.2"
+              strokeLinecap="round"
+            />
+          </svg>
+        </button>
       </div>
     </div>
   );
