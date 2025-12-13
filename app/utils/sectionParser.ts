@@ -121,12 +121,12 @@ export function findSectionInEditor(editor: any, sectionName: string): number | 
     // Search through the document for the heading
     let foundPos: number | null = null;
     
-    doc.descendants((node, pos) => {
+    doc.descendants((node: any, pos: number) => {
       if (foundPos !== null) return false; // Stop searching once found
       
       // Check if this is a heading node
-      if (node.type.name.startsWith('heading')) {
-        const headingText = node.textContent.trim();
+      if (node.type && node.type.name && node.type.name.startsWith('heading')) {
+        const headingText = node.textContent?.trim() || '';
         if (headingText === sectionName) {
           foundPos = pos;
           return false; // Stop iteration
