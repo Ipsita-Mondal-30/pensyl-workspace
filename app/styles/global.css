@@ -1,0 +1,695 @@
+@import "tailwindcss";
+
+/* TipTap Editor Styles */
+.ProseMirror {
+  outline: none;
+  min-height: 100%;
+  padding: 1rem;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.ProseMirror p {
+  margin: 0.75rem 0;
+  line-height: 1.6;
+}
+
+.ProseMirror h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  margin: 1.5rem 0 1rem 0;
+  line-height: 1.2;
+}
+
+.ProseMirror h2 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 1.25rem 0 0.75rem 0;
+  line-height: 1.3;
+}
+
+.ProseMirror h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 1rem 0 0.5rem 0;
+  line-height: 1.4;
+}
+
+.ProseMirror ul,
+.ProseMirror ol {
+  padding-left: 1.5rem;
+  margin: 0.75rem 0;
+}
+
+.ProseMirror li {
+  margin: 0.25rem 0;
+}
+
+.ProseMirror code {
+  background-color: var(--bg-secondary);
+  color: var(--accent-primary);
+  padding: 0.125rem 0.25rem;
+  border-radius: 0.25rem;
+  font-size: 0.875em;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.ProseMirror pre {
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: 0.5rem;
+  padding: 1rem;
+  margin: 1rem 0;
+  overflow-x: auto;
+}
+
+.ProseMirror pre code {
+  background-color: transparent;
+  padding: 0;
+  color: var(--text-primary);
+}
+
+.ProseMirror blockquote {
+  border-left: 3px solid var(--accent-primary);
+  padding-left: 1rem;
+  margin: 1rem 0;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.ProseMirror hr {
+  border: none;
+  border-top: 1px solid var(--border-primary);
+  margin: 1.5rem 0;
+}
+
+.ProseMirror strong {
+  font-weight: 600;
+}
+
+.ProseMirror em {
+  font-style: italic;
+}
+
+.ProseMirror s {
+  text-decoration: line-through;
+}
+
+.ProseMirror u {
+  text-decoration: underline;
+}
+
+.ProseMirror mark {
+  background-color: #fef08a;
+  color: inherit;
+  padding: 0.125rem 0.25rem;
+  border-radius: 0.25rem;
+}
+
+.ProseMirror sub {
+  font-size: 0.75em;
+  vertical-align: sub;
+}
+
+.ProseMirror sup {
+  font-size: 0.75em;
+  vertical-align: super;
+}
+
+/* Table Styles */
+.ProseMirror .editor-table {
+  border-collapse: collapse;
+  margin: 1rem 0;
+  table-layout: fixed;
+  width: 100%;
+  overflow: hidden;
+}
+
+.ProseMirror .editor-table td,
+.ProseMirror .editor-table th {
+  min-width: 1em;
+  border: 1px solid var(--border-primary);
+  padding: 6px 8px;
+  vertical-align: top;
+  box-sizing: border-box;
+  position: relative;
+}
+
+.ProseMirror .editor-table th {
+  font-weight: 600;
+  text-align: left;
+  background-color: var(--bg-secondary);
+}
+
+.ProseMirror .editor-table .selectedCell:after {
+  z-index: 2;
+  position: absolute;
+  content: "";
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  background: rgba(0, 123, 255, 0.1);
+  pointer-events: none;
+}
+
+.ProseMirror .editor-table .column-resize-handle {
+  position: absolute;
+  right: -2px;
+  top: 0;
+  bottom: -2px;
+  width: 4px;
+  background-color: var(--accent-primary);
+  pointer-events: none;
+}
+
+/* Link Styles */
+.ProseMirror .editor-link {
+  color: var(--accent-primary);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.ProseMirror .editor-link:hover {
+  color: var(--accent-hover);
+}
+
+/* Image Styles */
+.ProseMirror .editor-image {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--radius-md);
+  margin: 1rem 0;
+}
+
+.ProseMirror .editor-image.ProseMirror-selectednode {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+/* Search Highlight Styles - Yellow for regular matches */
+.ProseMirror mark[style*="background-color: rgb(255, 255, 0)"],
+.ProseMirror mark[style*="background-color:#ffff00"],
+.ProseMirror mark[style*="background-color: #ffff00"] {
+  background-color: rgba(255, 255, 0, 0.5) !important;
+  padding: 0.125rem 0.25rem;
+  border-radius: 0.125rem;
+  color: inherit;
+}
+
+/* Search Highlight Styles - Orange for current match */
+.ProseMirror mark[style*="background-color: rgb(255, 165, 0)"],
+.ProseMirror mark[style*="background-color:#ffa500"],
+.ProseMirror mark[style*="background-color: #ffa500"] {
+  background-color: rgba(255, 165, 0, 0.8) !important;
+  padding: 0.125rem 0.25rem;
+  border-radius: 0.125rem;
+  box-shadow: 0 0 0 2px rgba(255, 165, 0, 0.9);
+  color: inherit;
+  font-weight: 500;
+}
+
+/* Task List Styles */
+.ProseMirror .editor-task-list {
+  list-style: none;
+  padding: 0;
+}
+
+.ProseMirror .editor-task-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin: 0.25rem 0;
+}
+
+.ProseMirror .editor-task-item input[type="checkbox"] {
+  margin-top: 0.25rem;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.ProseMirror .editor-task-item > label {
+  flex: 1;
+  display: flex;
+  align-items: flex-start;
+}
+
+.ProseMirror .editor-task-item > div {
+  flex: 1;
+}
+
+/* Focus Styles */
+.ProseMirror.editor-focused {
+  outline: none;
+}
+
+/* Placeholder Styles */
+.ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: var(--text-tertiary);
+  pointer-events: none;
+  height: 0;
+}
+
+/* Line Numbers Styles */
+.line-numbers-gutter {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.line-numbers-content {
+  line-height: 1.5rem;
+}
+
+.line-number {
+  transition: all 0.15s ease-in-out;
+  cursor: default;
+  white-space: nowrap;
+  height: 1.5rem;
+  min-height: 1.5rem;
+  line-height: 1.5rem;
+  display: flex;
+  align-items: center;
+}
+
+.line-number:hover {
+  color: var(--text-secondary);
+}
+
+/* Ensure editor content has matching line height - CRITICAL for alignment */
+.ProseMirror {
+  line-height: 1.5rem !important;
+}
+
+.ProseMirror p {
+  line-height: 1.5rem !important;
+  margin: 0 !important;
+  min-height: 1.5rem !important;
+  padding: 0;
+}
+
+.ProseMirror h1,
+.ProseMirror h2,
+.ProseMirror h3,
+.ProseMirror h4,
+.ProseMirror h5,
+.ProseMirror h6 {
+  line-height: 1.5rem !important;
+  margin: 0 !important;
+  min-height: 1.5rem !important;
+  padding: 0;
+}
+
+.ProseMirror li {
+  line-height: 1.5rem !important;
+  margin: 0 !important;
+  min-height: 1.5rem !important;
+}
+
+.ProseMirror pre {
+  line-height: 1.5rem !important;
+  margin: 0 !important;
+}
+
+.ProseMirror blockquote {
+  line-height: 1.5rem !important;
+  margin: 0 !important;
+  min-height: 1.5rem !important;
+}
+
+/* Code block syntax highlighting */
+.ProseMirror pre code .hljs {
+  display: block;
+  overflow-x: auto;
+  padding: 0;
+  background: transparent;
+}
+
+.ProseMirror pre code .hljs-keyword {
+  color: #c792ea;
+}
+
+.ProseMirror pre code .hljs-string {
+  color: #c3e88d;
+}
+
+.ProseMirror pre code .hljs-comment {
+  color: #546e7a;
+  font-style: italic;
+}
+
+.ProseMirror pre code .hljs-number {
+  color: #f78c6c;
+}
+
+.ProseMirror pre code .hljs-function {
+  color: #82aaff;
+}
+
+.ProseMirror pre code .hljs-variable {
+  color: #eeffff;
+}
+
+/* Global Styles for Intellirite */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: var(--font-family-ui);
+  font-size: var(--font-size-base);
+  color: var(--text-primary);
+  background-color: var(--bg-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  user-select: none;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--scrollbar-bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: var(--radius-sm);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+}
+
+/* Selection */
+::selection {
+  background-color: var(--accent-primary);
+  color: var(--text-white);
+}
+
+/* Focus Styles */
+:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: -2px;
+}
+
+/* Button Reset */
+button {
+  font-family: inherit;
+  font-size: inherit;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: inherit;
+  padding: 0;
+}
+
+/* Input Reset */
+input,
+textarea {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+  border: none;
+  background: none;
+  outline: none;
+}
+
+/* Link Reset */
+a {
+  color: var(--accent-primary);
+  text-decoration: none;
+}
+
+a:hover {
+  color: var(--accent-hover);
+}
+
+/* Utility Classes */
+.flex {
+  display: flex;
+}
+
+.flex-col {
+  display: flex;
+  flex-direction: column;
+}
+
+.items-center {
+  align-items: center;
+}
+
+.justify-center {
+  justify-content: center;
+}
+
+.justify-between {
+  justify-content: space-between;
+}
+
+.gap-xs {
+  gap: var(--spacing-xs);
+}
+
+.gap-sm {
+  gap: var(--spacing-sm);
+}
+
+.gap-md {
+  gap: var(--spacing-md);
+}
+
+.gap-lg {
+  gap: var(--spacing-lg);
+}
+
+.text-sm {
+  font-size: var(--font-size-sm);
+}
+
+.text-base {
+  font-size: var(--font-size-base);
+}
+
+.text-md {
+  font-size: var(--font-size-md);
+}
+
+.text-lg {
+  font-size: var(--font-size-lg);
+}
+
+.font-medium {
+  font-weight: var(--font-weight-medium);
+}
+
+.font-semibold {
+  font-weight: var(--font-weight-semibold);
+}
+
+.text-secondary {
+  color: var(--text-secondary);
+}
+
+.text-tertiary {
+  color: var(--text-tertiary);
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.fade-in {
+  animation: fadeIn var(--transition-base);
+}
+
+.slide-down {
+  animation: slideDown var(--transition-base);
+}
+
+.slide-up {
+  animation: slideUp var(--transition-base);
+}
+
+.slide-in-right {
+  animation: slideInRight var(--transition-base);
+}
+
+.scale-in {
+  animation: scaleIn var(--transition-base);
+}
+
+/* Smooth transitions utility classes */
+.transition-smooth {
+  transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.transition-fast {
+  transition: all 100ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.transition-slow {
+  transition: all 300ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Diff Viewer Styles */
+.diff-viewer {
+  font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+  transition: all 0.2s ease;
+}
+
+.diff-viewer:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.diff-line {
+  transition: all 0.15s ease;
+  font-size: 13px;
+  letter-spacing: -0.01em;
+}
+
+.diff-line:hover {
+  filter: brightness(1.05);
+}
+
+.line-number {
+  font-variant-numeric: tabular-nums;
+}
+
+.line-content {
+  font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+  tab-size: 4;
+}
+
+/* Patch Preview Styles */
+.patch-preview {
+  animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.patch-item {
+  animation: fadeIn 0.2s ease-out;
+  transition: all 0.2s ease;
+}
+
+.patch-item:hover {
+  transform: translateY(-2px);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeInUp 0.3s ease-out;
+}
+
+/* Accept/Reject Button Animations */
+button:active {
+  transform: scale(0.95);
+}
+
+/* Smooth transitions for all interactive elements */
+.transition-all {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
