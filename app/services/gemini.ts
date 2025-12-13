@@ -1,15 +1,15 @@
+"use client";
 import { GoogleGenAI } from "@google/genai";
 
-"use client";
 // Gemini API Key - Read from environment variables
 // Set NEXT_PUBLIC_GEMINI_API_KEY in your .env.local file
 const API_KEY = (typeof window !== 'undefined' ? (process.env.NEXT_PUBLIC_GEMINI_API_KEY || "") : "");
 
 if (!API_KEY) {
   console.warn(
-    "⚠️ VITE_GEMINI_API_KEY not found in environment variables.\n" +
-    "Please create a .env file in the project root with:\n" +
-    "VITE_GEMINI_API_KEY=your_api_key_here"
+    "⚠️ NEXT_PUBLIC_GEMINI_API_KEY not found in environment variables.\n" +
+    "Please create a .env.local file in the project root with:\n" +
+    "NEXT_PUBLIC_GEMINI_API_KEY=your_api_key_here"
   );
 }
 

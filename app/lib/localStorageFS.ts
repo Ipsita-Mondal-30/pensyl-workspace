@@ -1,3 +1,4 @@
+"use client";
 /**
  * LocalStorage-based File System Service
  * Replaces Electron file system APIs for web version

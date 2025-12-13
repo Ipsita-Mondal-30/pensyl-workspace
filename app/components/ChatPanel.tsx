@@ -9,8 +9,8 @@ import {
 import ReactMarkdown from "react-markdown";
 import { useAIChat } from "../hooks/useAIChat";
 import type { Editor } from "@tiptap/react";
-import { PatchPreview, type Patch } from "./PatchPreview";
-import { parseAIResponse, applyPatch, applyPatches } from "../utils/patchParser";
+import { PatchPreview } from "./PatchPreview";
+import { parseAIResponse, applyPatch, applyPatches, type Patch } from "../utils/patchParser";
 
 interface Message {
   id: string;
@@ -794,12 +794,6 @@ function MessageBubble({
       {/* Patches Preview (if any) - Show BEFORE the message bubble */}
       {!isUser && message.hasPatches && message.patches && message.patches.length > 0 && (
         <div className="w-full mb-3">
-          {console.log('🎨 About to render PatchPreview:', {
-            patchCount: message.patches.length,
-            hasContent: !!currentFileContent,
-            contentLength: currentFileContent?.length || 0,
-            fileName: currentFileName
-          })}
           <PatchPreview
             patches={message.patches}
             currentFileContent={currentFileContent || ''}

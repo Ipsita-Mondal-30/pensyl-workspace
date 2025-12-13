@@ -1,3 +1,9 @@
 @import "tailwindcss";
 @import "./styles/theme.css";
 @import "./styles/global.css";
+
+/* Override Next.js default body styles */
+html, body {
+  height: 100vh;
+  overflow: hidden;
+}

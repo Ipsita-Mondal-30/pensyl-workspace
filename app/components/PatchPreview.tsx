@@ -1,17 +1,7 @@
+"use client";
 import { useState } from "react";
 import { DiffViewer } from "./DiffViewer";
-
-export interface Patch {
-  file: string;
-  type: "insert" | "replace" | "delete";
-  line?: number;
-  target?: {
-    startLine: number;
-    endLine: number;
-  };
-  content?: string;
-  replacement?: string;
-}
+import type { Patch } from "../utils/patchParser";
 
 interface PatchPreviewProps {
   patches: Patch[];

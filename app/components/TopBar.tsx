@@ -122,22 +122,25 @@ interface TopBarProps {
  */
 export function TopBar({ onOpenSettings }: TopBarProps = {}) {
   const [searchValue, setSearchValue] = useState("");
-  const [isMaximized, setIsMaximized] = useState(false);
+  const [isMaximized] = useState(false);
+  const [isMac, setIsMac] = useState(false);
 
-  // Safely detect platform with fallback
-  const isMac = (() => {
-    try {
-      // Try to use exposed platform API
-      if (typeof window !== "undefined" && (window as any).platform) {
-        return (window as any).platform.isMac === true;
+  // Safely detect platform with fallback (client-side only)
+  useEffect(() => {
+    if (typeof window !== "undefined" && typeof navigator !== "undefined") {
+      try {
+        // Try to use exposed platform API
+        if ((window as any).platform) {
+          setIsMac((window as any).platform.isMac === true);
+        } else {
+          // Fallback: detect from user agent
+          setIsMac(navigator.platform.toUpperCase().indexOf("MAC") >= 0);
+        }
+      } catch (error) {
+        setIsMac(false);
       }
-      // Fallback: detect from user agent
-      return navigator.platform.toUpperCase().indexOf("MAC") >= 0;
-    } catch (error) {
-      // Fallback to user agent detection on error
-      return navigator.platform.toUpperCase().indexOf("MAC") >= 0;
     }
-  })();
+  }, []);
 
   // Initialize and listen to window state changes
   useEffect(() => {

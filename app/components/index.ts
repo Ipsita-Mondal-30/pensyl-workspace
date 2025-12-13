@@ -12,7 +12,8 @@ export { CommandPalette, type Command } from './CommandPalette'
 export { SettingsModal } from './SettingsModal'
 export { InputDialog } from './InputDialog'
 export { DiffViewer } from './DiffViewer'
-export { PatchPreview, type Patch } from './PatchPreview'
+export { PatchPreview } from './PatchPreview'
+export type { Patch } from '../utils/patchParser'
 export * from './Icons'
 
 

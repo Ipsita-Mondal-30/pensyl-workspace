@@ -1,5 +1,4 @@
 "use client";
-"use client";
 import { useState } from "react";
 import { ChevronRightIcon, FolderIcon, FileIcon, PlusIcon, EditIcon, TrashIcon } from "./Icons";
 import { ContextMenu, type ContextMenuItem } from "./ContextMenu";
@@ -102,7 +101,7 @@ export function Sidebar({
             onNewFolder?.(item.path);
           },
         },
-        { id: "sep1", label: "", separator: true }
+        { id: "sep1", label: "", separator: true, onClick: () => {} }
       );
     }
 
