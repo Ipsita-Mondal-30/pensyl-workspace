@@ -10,9 +10,20 @@ import {
   CommandPalette,
   SettingsModal,
   InputDialog,
+  ViewModeToggle,
+  ReviewPanel,
+  SectionAnalytics,
+  CitationHeatmap,
+  AutoToC,
+  MissingCitationIndicator,
   type CursorPosition,
   type Command,
 } from "./components";
+import { FigureEditor } from "./components/FigureEditor";
+import { MathEditor } from "./components/MathEditor";
+import { CitationDialog } from "./components/CitationDialog";
+import { TableInsertDialog } from "./components/TableInsertDialog";
+import type { ViewMode } from "./components/ViewModeToggle";
 import type { FileItem } from "./shared/types";
 import type { TabData } from "./components/Tab";
 import TurndownService from "turndown";
@@ -24,6 +35,10 @@ import {
   addSectionToDocument,
   type Section,
 } from "./utils/sectionParser";
+import { exportToMarkdown } from "./lib/export/markdownExporter";
+import { exportToLaTeX } from "./lib/export/latexExporter";
+import { exportToDOCX } from "./lib/export/docxExporter";
+import { calculateDocumentAnalytics } from "./utils/documentAnalytics";
 
 function App() {
   const [currentFolder, setCurrentFolder] = useState<string | undefined>();
@@ -64,6 +79,23 @@ function App() {
 
   // Settings modal state
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
+  // View mode state
+  const [viewMode, setViewMode] = useState<ViewMode>("writing");
+
+  // Review panel state
+  const [isReviewPanelOpen, setIsReviewPanelOpen] = useState(false);
+
+  // Analytics state
+  const [showAnalytics, setShowAnalytics] = useState(false);
+  const [analytics, setAnalytics] = useState<any>(null);
+
+  // Insert dialog state
+  const [showFigureDialog, setShowFigureDialog] = useState(false);
+  const [showMathDialog, setShowMathDialog] = useState(false);
+  const [showCitationDialog, setShowCitationDialog] = useState(false);
+  const [showTableDialog, setShowTableDialog] = useState(false);
+  const [mathDialogIsBlock, setMathDialogIsBlock] = useState(true);
 
   // Input dialog state (for folder/file creation)
   const [inputDialog, setInputDialog] = useState<{
@@ -560,6 +592,373 @@ function App() {
     [tabs, currentFolder, loadFolder]
   );
 
+  // Handle insert research paper elements
+  const handleInsert = useCallback(
+    (
+      type:
+        | "title"
+        | "abstract"
+        | "introduction"
+        | "methods"
+        | "results"
+        | "discussion"
+        | "conclusion"
+        | "figure"
+        | "equation"
+        | "citation"
+        | "table"
+    ) => {
+      if (!editorRef.current) {
+        alert("No editor available");
+        return;
+      }
+
+      const editor = editorRef.current;
+
+      switch (type) {
+        case "title":
+          // Insert a heading level 1 with "Title" placeholder
+          editor
+            .chain()
+            .focus()
+            .insertContent({
+              type: "heading",
+              attrs: { level: 1 },
+              content: [{ type: "text", text: "Title" }],
+            })
+            .run();
+          // Select the text so user can immediately type
+          setTimeout(() => {
+            const { state } = editor.view;
+            const { doc } = state;
+            const titleNode = doc.firstChild;
+            if (titleNode && titleNode.type.name === "heading") {
+              editor.commands.setTextSelection({
+                from: titleNode.start + 1,
+                to: titleNode.end - 1,
+              });
+            }
+          }, 10);
+          break;
+
+        case "abstract":
+          editor
+            .chain()
+            .focus()
+            .insertContent({
+              type: "heading",
+              attrs: { level: 2 },
+              content: [{ type: "text", text: "Abstract" }],
+            })
+            .insertContent({
+              type: "paragraph",
+              content: [{ type: "text", text: "" }],
+            })
+            .run();
+          break;
+
+        case "introduction":
+          editor
+            .chain()
+            .focus()
+            .insertContent({
+              type: "heading",
+              attrs: { level: 2 },
+              content: [{ type: "text", text: "Introduction" }],
+            })
+            .insertContent({
+              type: "paragraph",
+              content: [{ type: "text", text: "" }],
+            })
+            .run();
+          break;
+
+        case "methods":
+          editor
+            .chain()
+            .focus()
+            .insertContent({
+              type: "heading",
+              attrs: { level: 2 },
+              content: [{ type: "text", text: "Methods" }],
+            })
+            .insertContent({
+              type: "paragraph",
+              content: [{ type: "text", text: "" }],
+            })
+            .run();
+          break;
+
+        case "results":
+          editor
+            .chain()
+            .focus()
+            .insertContent({
+              type: "heading",
+              attrs: { level: 2 },
+              content: [{ type: "text", text: "Results" }],
+            })
+            .insertContent({
+              type: "paragraph",
+              content: [{ type: "text", text: "" }],
+            })
+            .run();
+          break;
+
+        case "discussion":
+          editor
+            .chain()
+            .focus()
+            .insertContent({
+              type: "heading",
+              attrs: { level: 2 },
+              content: [{ type: "text", text: "Discussion" }],
+            })
+            .insertContent({
+              type: "paragraph",
+              content: [{ type: "text", text: "" }],
+            })
+            .run();
+          break;
+
+        case "conclusion":
+          editor
+            .chain()
+            .focus()
+            .insertContent({
+              type: "heading",
+              attrs: { level: 2 },
+              content: [{ type: "text", text: "Conclusion" }],
+            })
+            .insertContent({
+              type: "paragraph",
+              content: [{ type: "text", text: "" }],
+            })
+            .run();
+          break;
+
+        case "figure":
+          setShowFigureDialog(true);
+          break;
+
+        case "equation":
+          setMathDialogIsBlock(true);
+          setShowMathDialog(true);
+          break;
+
+        case "citation":
+          setShowCitationDialog(true);
+          break;
+
+        case "table":
+          setShowTableDialog(true);
+          break;
+      }
+    },
+    []
+  );
+
+  // Handle figure insertion
+  const handleInsertFigure = useCallback((figure: any) => {
+    if (!editorRef.current) return;
+    const editor = editorRef.current;
+    (editor.commands as any).insertFigure(figure);
+    setShowFigureDialog(false);
+  }, []);
+
+  // Handle math insertion
+  const handleInsertMath = useCallback((latex: string, isBlock: boolean) => {
+    if (!editorRef.current) return;
+    const editor = editorRef.current;
+    if (isBlock) {
+      (editor.commands as any).insertEquation({ latex });
+    } else {
+      editor.chain().focus().setInlineMath(latex).run();
+    }
+    setShowMathDialog(false);
+  }, []);
+
+  // Handle citation insertion
+  const handleInsertCitation = useCallback(
+    (citationId: string, style: "apa" | "ieee" | "mla" | "acm") => {
+      if (!editorRef.current) return;
+      const editor = editorRef.current;
+      (editor.commands as any).insertCitation(citationId, style);
+      setShowCitationDialog(false);
+    },
+    []
+  );
+
+  // Handle table insertion
+  const handleInsertTable = useCallback(
+    (options: {
+      rows: number;
+      cols: number;
+      withHeaderRow: boolean;
+      caption?: string;
+      label?: string;
+    }) => {
+      if (!editorRef.current) return;
+      const editor = editorRef.current;
+      editor
+        .chain()
+        .focus()
+        .insertTable({
+          rows: options.rows,
+          cols: options.cols,
+          withHeaderRow: options.withHeaderRow,
+        })
+        .run();
+      if (options.caption) {
+        setTimeout(() => {
+          (editor.commands as any).setTableCaption(
+            options.caption,
+            0,
+            options.label || ""
+          );
+        }, 100);
+      }
+      setShowTableDialog(false);
+    },
+    []
+  );
+
+  // Handle formatting actions
+  const handleFormat = useCallback(
+    (
+      action:
+        | "bold"
+        | "italic"
+        | "underline"
+        | "heading1"
+        | "heading2"
+        | "heading3"
+        | "bulletList"
+        | "orderedList"
+        | "blockquote"
+        | "codeBlock"
+    ) => {
+      if (!editorRef.current) return;
+      const editor = editorRef.current;
+
+      switch (action) {
+        case "bold":
+          editor.chain().focus().toggleBold().run();
+          break;
+        case "italic":
+          editor.chain().focus().toggleItalic().run();
+          break;
+        case "underline":
+          editor.chain().focus().toggleUnderline().run();
+          break;
+        case "heading1":
+          editor.chain().focus().toggleHeading({ level: 1 }).run();
+          break;
+        case "heading2":
+          editor.chain().focus().toggleHeading({ level: 2 }).run();
+          break;
+        case "heading3":
+          editor.chain().focus().toggleHeading({ level: 3 }).run();
+          break;
+        case "bulletList":
+          editor.chain().focus().toggleBulletList().run();
+          break;
+        case "orderedList":
+          editor.chain().focus().toggleOrderedList().run();
+          break;
+        case "blockquote":
+          editor.chain().focus().toggleBlockquote().run();
+          break;
+        case "codeBlock":
+          editor.chain().focus().toggleCodeBlock().run();
+          break;
+      }
+    },
+    []
+  );
+
+  // Handle export
+  const handleExport = useCallback(
+    async (format: "pdf" | "docx" | "latex" | "markdown") => {
+      if (!editorRef.current) {
+        alert("No editor available");
+        return;
+      }
+
+      try {
+        switch (format) {
+          case "markdown": {
+            const markdown = exportToMarkdown(editorRef.current);
+            const blob = new Blob([markdown], { type: "text/markdown" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "research-paper.md";
+            a.click();
+            URL.revokeObjectURL(url);
+            break;
+          }
+          case "latex": {
+            const latex = exportToLaTeX(editorRef.current);
+            const blob = new Blob([latex], { type: "text/plain" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "research-paper.tex";
+            a.click();
+            URL.revokeObjectURL(url);
+            break;
+          }
+          case "docx": {
+            const blob = await exportToDOCX(editorRef.current);
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "research-paper.docx";
+            a.click();
+            URL.revokeObjectURL(url);
+            break;
+          }
+          case "pdf": {
+            // PDF export via server-side API
+            try {
+              const html = editorRef.current.getHTML();
+              const response = await fetch("/api/export/pdf", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ html, title: "research-paper" }),
+              });
+
+              if (response.ok) {
+                const blob = await response.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = "research-paper.pdf";
+                a.click();
+                URL.revokeObjectURL(url);
+              } else {
+                const data = await response.json();
+                alert(
+                  data.message ||
+                    "PDF export is not fully configured. Install puppeteer for full functionality."
+                );
+              }
+            } catch (error) {
+              console.error("PDF export error:", error);
+              alert("Error exporting PDF. Please check server configuration.");
+            }
+            break;
+          }
+        }
+      } catch (error) {
+        console.error("Export error:", error);
+        alert(`Error exporting to ${format}: ${error}`);
+      }
+    },
+    []
+  );
+
   const commands: Command[] = [
     {
       id: "open-folder",
@@ -610,6 +1009,28 @@ function App() {
       category: "General",
       action: () => {
         setIsSettingsOpen(true);
+      },
+    },
+    {
+      id: "review-panel",
+      label: "Open Review Panel",
+      description: "Open review panel for comments and track changes",
+      category: "View",
+      action: () => {
+        setIsReviewPanelOpen(true);
+      },
+    },
+    {
+      id: "analytics",
+      label: "Show Document Analytics",
+      description: "View document statistics and citation metrics",
+      category: "View",
+      action: () => {
+        setShowAnalytics(true);
+        if (editorRef.current) {
+          const analyticsData = calculateDocumentAnalytics(editorRef.current);
+          setAnalytics(analyticsData);
+        }
       },
     },
   ];
@@ -667,6 +1088,9 @@ function App() {
       <TopBar
         onOpenSettings={() => setIsSettingsOpen(true)}
         onOpenAI={() => setIsChatCollapsed(false)}
+        onExport={handleExport}
+        onInsert={handleInsert}
+        onFormat={handleFormat}
         onAddSource={(type) => {
           console.log("Add source:", type);
           // TODO: Implement source addition
@@ -674,10 +1098,6 @@ function App() {
         onCite={() => {
           console.log("Cite");
           // TODO: Implement citation
-        }}
-        onExport={(format) => {
-          console.log("Export:", format);
-          // TODO: Implement export
         }}
       />
       <div className="flex overflow-hidden flex-1">
@@ -714,20 +1134,31 @@ function App() {
               (() => {
                 const activeTab = tabs.find((t) => t.id === activeTabId);
                 return activeTab ? (
-                  <Editor
-                    ref={editorRef}
-                    content={activeTab.content || ""}
-                    onChange={(content) =>
-                      handleEditorChange(activeTab.id, content)
-                    }
-                    onUpdate={(isModified) =>
-                      handleEditorUpdate(activeTab.id, isModified)
-                    }
-                    onCursorChange={(line, column) => {
-                      setCursorPosition({ line, column });
-                    }}
-                    editable={true}
-                  />
+                  <>
+                    {/* View Mode Toggle */}
+                    <div className="flex items-center justify-end px-4 py-2 border-b border-[var(--border-primary)]">
+                      <ViewModeToggle
+                        editor={editorRef.current}
+                        currentMode={viewMode}
+                        onModeChange={setViewMode}
+                      />
+                    </div>
+                    <Editor
+                      ref={editorRef}
+                      content={activeTab.content || ""}
+                      onChange={(content) =>
+                        handleEditorChange(activeTab.id, content)
+                      }
+                      onUpdate={(isModified) =>
+                        handleEditorUpdate(activeTab.id, isModified)
+                      }
+                      onCursorChange={(line, column) => {
+                        setCursorPosition({ line, column });
+                      }}
+                      editable={true}
+                      viewMode={viewMode}
+                    />
+                  </>
                 ) : null;
               })()
             ) : (
@@ -808,6 +1239,75 @@ function App() {
         title={inputDialog.title}
         placeholder={inputDialog.placeholder}
         defaultValue={inputDialog.defaultValue}
+      />
+
+      {/* Review Panel */}
+      <ReviewPanel
+        editor={editorRef.current}
+        isOpen={isReviewPanelOpen}
+        onClose={() => setIsReviewPanelOpen(false)}
+      />
+
+      {/* Missing Citation Indicator */}
+      <MissingCitationIndicator editor={editorRef.current} />
+
+      {/* Analytics Panel (can be toggled via command palette or button) */}
+      {showAnalytics && analytics && (
+        <div className="fixed bottom-4 left-4 w-96 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg shadow-xl p-4 z-50 max-h-[80vh] overflow-y-auto">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-[var(--text-primary)]">
+              Document Analytics
+            </h3>
+            <button
+              onClick={() => setShowAnalytics(false)}
+              className="text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+            >
+              ✕
+            </button>
+          </div>
+          <SectionAnalytics analytics={analytics} />
+          <div className="mt-4">
+            <CitationHeatmap analytics={analytics} />
+          </div>
+        </div>
+      )}
+
+      {/* Auto Table of Contents (can be shown in sidebar or as floating panel) */}
+      {activeTabId && editorRef.current && (
+        <div className="fixed top-20 right-4 w-64 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg shadow-lg p-4 z-40 max-h-[60vh] overflow-y-auto">
+          <AutoToC
+            editor={editorRef.current}
+            onItemClick={(pos) => {
+              editorRef.current?.commands.setTextSelection(pos);
+            }}
+          />
+        </div>
+      )}
+
+      {/* Insert Dialogs */}
+      <FigureEditor
+        editor={editorRef.current}
+        isOpen={showFigureDialog}
+        onClose={() => setShowFigureDialog(false)}
+        onInsert={handleInsertFigure}
+      />
+      <MathEditor
+        editor={editorRef.current}
+        isOpen={showMathDialog}
+        onClose={() => setShowMathDialog(false)}
+        onInsert={handleInsertMath}
+        isBlock={mathDialogIsBlock}
+      />
+      <CitationDialog
+        editor={editorRef.current}
+        isOpen={showCitationDialog}
+        onClose={() => setShowCitationDialog(false)}
+        onInsert={handleInsertCitation}
+      />
+      <TableInsertDialog
+        isOpen={showTableDialog}
+        onClose={() => setShowTableDialog(false)}
+        onInsert={handleInsertTable}
       />
     </div>
   );

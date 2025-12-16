@@ -7,6 +7,8 @@ interface TopBarProps {
   onAddSource?: (type: "pdf" | "doi" | "zotero") => void;
   onCite?: () => void;
   onExport?: (format: "pdf" | "docx" | "latex" | "markdown") => void;
+  onInsert?: (type: "title" | "abstract" | "introduction" | "methods" | "results" | "discussion" | "conclusion" | "figure" | "equation" | "citation" | "table") => void;
+  onFormat?: (action: "bold" | "italic" | "underline" | "heading1" | "heading2" | "heading3" | "bulletList" | "orderedList" | "blockquote" | "codeBlock") => void;
 }
 
 /**
@@ -18,6 +20,8 @@ export function TopBar({
   onAddSource,
   onCite,
   onExport,
+  onInsert,
+  onFormat,
 }: TopBarProps = {}) {
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const dropdownRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
@@ -27,14 +31,26 @@ export function TopBar({
     const handleClickOutside = (event: MouseEvent) => {
       if (openDropdown) {
         const dropdown = dropdownRefs.current[openDropdown];
-        if (dropdown && !dropdown.contains(event.target as Node)) {
-          setOpenDropdown(null);
+        const target = event.target as Node;
+        if (dropdown && !dropdown.contains(target)) {
+          // Also check if the click is on the button itself
+          const button = (event.target as HTMLElement)?.closest('button');
+          if (!button || !button.closest('.relative')) {
+            setOpenDropdown(null);
+          }
         }
       }
     };
 
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    // Use a small delay to allow click events to process first
+    const timeoutId = setTimeout(() => {
+      document.addEventListener("mousedown", handleClickOutside);
+    }, 0);
+
+    return () => {
+      clearTimeout(timeoutId);
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
   }, [openDropdown]);
 
   const toggleDropdown = (id: string) => {
@@ -58,12 +74,16 @@ export function TopBar({
   }) => (
     <div className="relative">
       <button
-        onClick={() => {
+        onClick={(e) => {
+          e.stopPropagation();
           if (hasDropdown) {
             toggleDropdown(id);
           } else {
             onClick?.();
           }
+        }}
+        onMouseDown={(e) => {
+          e.stopPropagation();
         }}
         className={`
           flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium
@@ -102,6 +122,12 @@ export function TopBar({
           ref={(el) => {
             dropdownRefs.current[id] = el;
           }}
+          onClick={(e) => {
+            e.stopPropagation();
+          }}
+          onMouseDown={(e) => {
+            e.stopPropagation();
+          }}
           className="absolute top-full left-0 mt-1 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg shadow-xl py-1.5 min-w-[200px] z-50"
         >
           {children}
@@ -122,9 +148,17 @@ export function TopBar({
     shortcut?: string;
   }) => (
     <button
-      onClick={() => {
+      onClick={(e) => {
+        e.stopPropagation();
+        e.preventDefault();
         onClick();
-        setOpenDropdown(null);
+        // Small delay before closing to ensure click is processed
+        setTimeout(() => {
+          setOpenDropdown(null);
+        }, 100);
+      }}
+      onMouseDown={(e) => {
+        e.stopPropagation();
       }}
       className="w-full flex items-center gap-2 px-3 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors text-left"
     >
@@ -144,6 +178,91 @@ export function TopBar({
     <div className="flex items-center justify-between h-11 bg-[var(--bg-secondary)] border-b border-[var(--border-primary)] px-4 select-none">
       {/* Left: Core Features */}
       <div className="flex items-center gap-1">
+        {/* 0. Insert - Research Paper Elements */}
+        <TopBarButton
+          id="insert"
+          label="Insert"
+          icon={
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path
+                d="M8 3V13M3 8H13"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+              />
+            </svg>
+          }
+          hasDropdown={true}
+        >
+          <div className="px-2 py-1.5 text-xs font-semibold text-[var(--text-secondary)] uppercase">
+            Document Structure
+          </div>
+          <DropdownItem
+            icon="📝"
+            label="Title"
+            onClick={() => onInsert?.("title")}
+            shortcut="⌘T"
+          />
+          <DropdownItem
+            icon="📄"
+            label="Abstract"
+            onClick={() => onInsert?.("abstract")}
+          />
+          <DropdownItem
+            icon="📖"
+            label="Introduction"
+            onClick={() => onInsert?.("introduction")}
+          />
+          <DropdownItem
+            icon="🔬"
+            label="Methods"
+            onClick={() => onInsert?.("methods")}
+          />
+          <DropdownItem
+            icon="📊"
+            label="Results"
+            onClick={() => onInsert?.("results")}
+          />
+          <DropdownItem
+            icon="💭"
+            label="Discussion"
+            onClick={() => onInsert?.("discussion")}
+          />
+          <DropdownItem
+            icon="✅"
+            label="Conclusion"
+            onClick={() => onInsert?.("conclusion")}
+          />
+          <div className="border-t border-[var(--border-primary)] my-1" />
+          <div className="px-2 py-1.5 text-xs font-semibold text-[var(--text-secondary)] uppercase">
+            Research Elements
+          </div>
+          <DropdownItem
+            icon="🖼️"
+            label="Figure"
+            onClick={() => onInsert?.("figure")}
+            shortcut="⌘F"
+          />
+          <DropdownItem
+            icon="∑"
+            label="Equation"
+            onClick={() => onInsert?.("equation")}
+            shortcut="⌘E"
+          />
+          <DropdownItem
+            icon="🔖"
+            label="Citation"
+            onClick={() => onInsert?.("citation")}
+            shortcut="⌘⇧C"
+          />
+          <DropdownItem
+            icon="📋"
+            label="Table"
+            onClick={() => onInsert?.("table")}
+            shortcut="⌘⇧T"
+          />
+        </TopBarButton>
+
         {/* 1. Add Source */}
         <TopBarButton
           id="add-source"
@@ -347,7 +466,89 @@ export function TopBar({
           }}
         />
 
-        {/* 8. LaTeX */}
+        {/* 8. Format - Make formatting more accessible */}
+        <TopBarButton
+          id="format"
+          label="Format"
+          icon={
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path
+                d="M4 4H12M4 8H12M4 12H8"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+              />
+            </svg>
+          }
+          hasDropdown={true}
+        >
+          <div className="px-2 py-1.5 text-xs font-semibold text-[var(--text-secondary)] uppercase">
+            Text Formatting
+          </div>
+          <DropdownItem
+            icon="B"
+            label="Bold"
+            onClick={() => onFormat?.("bold")}
+            shortcut="⌘B"
+          />
+          <DropdownItem
+            icon="I"
+            label="Italic"
+            onClick={() => onFormat?.("italic")}
+            shortcut="⌘I"
+          />
+          <DropdownItem
+            icon="U"
+            label="Underline"
+            onClick={() => onFormat?.("underline")}
+            shortcut="⌘U"
+          />
+          <div className="border-t border-[var(--border-primary)] my-1" />
+          <div className="px-2 py-1.5 text-xs font-semibold text-[var(--text-secondary)] uppercase">
+            Structure
+          </div>
+          <DropdownItem
+            icon="H1"
+            label="Heading 1"
+            onClick={() => onFormat?.("heading1")}
+            shortcut="⌘⇧1"
+          />
+          <DropdownItem
+            icon="H2"
+            label="Heading 2"
+            onClick={() => onFormat?.("heading2")}
+            shortcut="⌘⇧2"
+          />
+          <DropdownItem
+            icon="H3"
+            label="Heading 3"
+            onClick={() => onFormat?.("heading3")}
+            shortcut="⌘⇧3"
+          />
+          <div className="border-t border-[var(--border-primary)] my-1" />
+          <DropdownItem
+            icon="•"
+            label="Bullet List"
+            onClick={() => onFormat?.("bulletList")}
+          />
+          <DropdownItem
+            icon="1."
+            label="Numbered List"
+            onClick={() => onFormat?.("orderedList")}
+          />
+          <DropdownItem
+            icon="❝"
+            label="Blockquote"
+            onClick={() => onFormat?.("blockquote")}
+          />
+          <DropdownItem
+            icon="</>"
+            label="Code Block"
+            onClick={() => onFormat?.("codeBlock")}
+          />
+        </TopBarButton>
+
+        {/* 9. LaTeX */}
         <TopBarButton
           id="latex"
           label="LaTeX"

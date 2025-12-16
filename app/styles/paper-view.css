@@ -1,0 +1,184 @@
+/* Paper View Mode Styling - Academic Paper Appearance */
+
+.paper-view {
+  max-width: 780px;
+  margin: 0 auto;
+  font-family: 'Times New Roman', 'Times', serif;
+  line-height: 1.6;
+  padding: 2rem;
+  background: white;
+  color: #000;
+}
+
+.paper-view h1 {
+  font-size: 18pt;
+  font-weight: bold;
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+  text-align: center;
+}
+
+.paper-view h2 {
+  font-size: 16pt;
+  font-weight: bold;
+  margin-top: 1.2em;
+  margin-bottom: 0.5em;
+}
+
+.paper-view h3 {
+  font-size: 14pt;
+  font-weight: bold;
+  margin-top: 1em;
+  margin-bottom: 0.5em;
+}
+
+.paper-view h4 {
+  font-size: 12pt;
+  font-weight: bold;
+  margin-top: 0.8em;
+  margin-bottom: 0.5em;
+}
+
+.paper-view p {
+  font-size: 12pt;
+  margin-bottom: 0.5em;
+  text-align: justify;
+  text-indent: 0.5in;
+}
+
+.paper-view p:first-of-type,
+.paper-view .no-indent {
+  text-indent: 0;
+}
+
+.paper-view .research-abstract {
+  margin: 1em 0;
+  padding: 1em;
+  background: #f9f9f9;
+  border-left: 3px solid #333;
+}
+
+.paper-view .research-abstract p {
+  text-indent: 0;
+  margin-bottom: 0.5em;
+}
+
+.paper-view .research-section {
+  margin: 1.5em 0;
+}
+
+.paper-view .research-figure {
+  margin: 1.5em auto;
+  text-align: center;
+  page-break-inside: avoid;
+}
+
+.paper-view .figure-image-container {
+  margin-bottom: 0.5em;
+}
+
+.paper-view .figure-caption {
+  font-size: 10pt;
+  font-style: italic;
+  text-align: center;
+  margin-top: 0.5em;
+}
+
+.paper-view .research-equation {
+  margin: 1.5em auto;
+  text-align: center;
+  page-break-inside: avoid;
+}
+
+.paper-view .equation-content {
+  display: inline-block;
+  margin: 0 auto;
+}
+
+.paper-view .equation-number {
+  display: inline-block;
+  margin-left: 1em;
+  font-size: 12pt;
+}
+
+.paper-view .research-table {
+  margin: 1.5em auto;
+  border-collapse: collapse;
+  width: 100%;
+  page-break-inside: avoid;
+}
+
+.paper-view .research-table caption {
+  font-size: 10pt;
+  font-style: italic;
+  text-align: center;
+  margin-bottom: 0.5em;
+}
+
+.paper-view .research-table th,
+.paper-view .research-table td {
+  border: 1px solid #000;
+  padding: 0.5em;
+  font-size: 11pt;
+}
+
+.paper-view .research-table th {
+  background: #f0f0f0;
+  font-weight: bold;
+}
+
+.paper-view .citation-mark {
+  color: #0066cc;
+  font-weight: normal;
+  cursor: pointer;
+}
+
+.paper-view .citation-mark:hover {
+  text-decoration: underline;
+}
+
+.paper-view .research-references {
+  margin-top: 2em;
+  page-break-before: always;
+}
+
+.paper-view .research-references h1,
+.paper-view .research-references h2 {
+  font-size: 14pt;
+  font-weight: bold;
+  margin-bottom: 1em;
+  text-align: left;
+}
+
+.paper-view .research-references p {
+  text-indent: -0.5in;
+  padding-left: 0.5in;
+  margin-bottom: 0.5em;
+  font-size: 11pt;
+}
+
+/* LaTeX Preview Mode */
+.latex-view {
+  font-family: 'Courier New', 'Courier', monospace;
+  font-size: 11pt;
+  line-height: 1.4;
+  background: #f5f5f5;
+  color: #000;
+  padding: 1rem;
+  white-space: pre-wrap;
+  overflow-x: auto;
+}
+
+.latex-view .latex-comment {
+  color: #008000;
+}
+
+.latex-view .latex-command {
+  color: #0000ff;
+  font-weight: bold;
+}
+
+.latex-view .latex-brace {
+  color: #800080;
+}
+

@@ -22,6 +22,24 @@ import { Focus } from "@tiptap/extension-focus";
 import { Dropcursor } from "@tiptap/extension-dropcursor";
 import { Gapcursor } from "@tiptap/extension-gapcursor";
 import { createLowlight } from "lowlight";
+// Research paper extensions
+import { PaperNode } from "../extensions/research-paper/PaperNode";
+import { FrontMatterNode } from "../extensions/research-paper/FrontMatterNode";
+import { AbstractNode } from "../extensions/research-paper/AbstractNode";
+import { SectionNode } from "../extensions/research-paper/SectionNode";
+import { FigureNode } from "../extensions/research-paper/FigureNode";
+import { CaptionNode } from "../extensions/research-paper/CaptionNode";
+import { TableCaption } from "../extensions/research-paper/TableCaption";
+import { InlineMathNode } from "../extensions/research-paper/InlineMathNode";
+import { BlockEquationNode } from "../extensions/research-paper/BlockEquationNode";
+import { CitationMark } from "../extensions/research-paper/CitationMark";
+import { ReferenceNode } from "../extensions/research-paper/ReferenceNode";
+import { TrackChanges } from "../extensions/research-paper/TrackChanges";
+import { CommentMark } from "../extensions/research-paper/CommentMark";
+import { FontSize } from "../extensions/FontSize";
+// Contextual toolbar
+import { useSectionContext } from "../hooks/useSectionContext";
+import { ContextualToolbar } from "./ContextualToolbar";
 import {
   useEffect,
   useState,
@@ -77,13 +95,21 @@ interface EditorProps {
   onUpdate?: (isModified: boolean) => void;
   onCursorChange?: (line: number, column: number) => void;
   editable?: boolean;
+  viewMode?: "writing" | "paper" | "latex";
 }
 
 /**
  * Advanced Editor component using TipTap with extensive features
  */
 export const Editor = forwardRef<any, EditorProps>(function Editor(
-  { content, onChange, onUpdate, onCursorChange, editable = true },
+  {
+    content,
+    onChange,
+    onUpdate,
+    onCursorChange,
+    editable = true,
+    viewMode = "writing",
+  },
   ref
 ) {
   const [linkUrl, setLinkUrl] = useState("");
@@ -110,6 +136,13 @@ export const Editor = forwardRef<any, EditorProps>(function Editor(
   const [toolbarPosition, setToolbarPosition] = useState({ top: 0, left: 0 });
   const floatingToolbarRef = useRef<HTMLDivElement>(null);
 
+  // Contextual toolbar state (research-aware) - will be set after editor is created
+  const [showContextualToolbar, setShowContextualToolbar] = useState(false);
+  const [contextualToolbarPosition, setContextualToolbarPosition] = useState({
+    top: 0,
+    left: 0,
+  });
+
   const editor = useEditor({
     immediatelyRender: false, // Required for SSR/Next.js to avoid hydration mismatches
     extensions: [
@@ -126,9 +159,10 @@ export const Editor = forwardRef<any, EditorProps>(function Editor(
       Table.configure({
         resizable: true,
         HTMLAttributes: {
-          class: "editor-table",
+          class: "editor-table research-table",
         },
       }),
+      TableCaption,
       TableRow,
       TableHeader,
       TableCell,
@@ -157,6 +191,7 @@ export const Editor = forwardRef<any, EditorProps>(function Editor(
         },
       }),
       Underline,
+      FontSize,
       TextAlign.configure({
         types: ["heading", "paragraph"],
       }),
@@ -179,8 +214,21 @@ export const Editor = forwardRef<any, EditorProps>(function Editor(
         width: 2,
       }),
       Gapcursor,
+      // Research paper nodes (optional - maintains backward compatibility)
+      PaperNode,
+      FrontMatterNode,
+      AbstractNode,
+      SectionNode,
+      FigureNode,
+      CaptionNode,
+      InlineMathNode,
+      BlockEquationNode,
+      CitationMark,
+      ReferenceNode,
+      TrackChanges,
+      CommentMark,
     ],
-    content: content || "",
+    content: content || "<p></p>", // Ensure valid HTML structure
     editable,
     onUpdate: ({ editor }) => {
       const html = editor.getHTML();
@@ -197,13 +245,17 @@ export const Editor = forwardRef<any, EditorProps>(function Editor(
   // Expose editor instance to parent via ref
   useImperativeHandle(ref, () => editor, [editor]);
 
+  // Contextual toolbar state (research-aware) - initialize after editor is created
+  // Always call the hook (Rules of Hooks) - it handles null editor internally
+  const sectionContext = useSectionContext(editor);
+
   // Handle floating toolbar on text selection (Notion-style)
   useEffect(() => {
     if (!editor || !editable || !editorContentRef.current) return;
 
     const updateToolbar = () => {
       if (!editorContentRef.current) return;
-      
+
       const { state } = editor.view;
       const { selection } = state;
       const { from, to } = selection;
@@ -213,14 +265,14 @@ export const Editor = forwardRef<any, EditorProps>(function Editor(
         try {
           const start = editor.view.coordsAtPos(from);
           const end = editor.view.coordsAtPos(to);
-          
+
           // Get editor container position
           const editorRect = editorContentRef.current.getBoundingClientRect();
-          
+
           // Position toolbar above selection, centered
           const top = Math.min(start.top, end.top) - 10 + window.scrollY;
           const left = (start.left + end.left) / 2 + window.scrollX;
-          
+
           setToolbarPosition({ top, left });
           setShowFloatingToolbar(true);
         } catch (error) {
@@ -231,21 +283,53 @@ export const Editor = forwardRef<any, EditorProps>(function Editor(
       }
     };
 
+    // Update contextual toolbar position when cursor moves (no selection)
+    const updateContextualToolbar = () => {
+      if (!editorContentRef.current) return;
+
+      const { state } = editor.view;
+      const { selection } = state;
+      const { from, to } = selection;
+
+      // Show contextual toolbar when there's no selection (just cursor)
+      if (from === to && sectionContext) {
+        try {
+          const coords = editor.view.coordsAtPos(from);
+          const top = coords.top - 10 + window.scrollY;
+          const left = coords.left + window.scrollX;
+
+          setContextualToolbarPosition({ top, left });
+          setShowContextualToolbar(true);
+        } catch (error) {
+          setShowContextualToolbar(false);
+        }
+      } else {
+        setShowContextualToolbar(false);
+      }
+    };
+
     editor.on("selectionUpdate", updateToolbar);
+    editor.on("selectionUpdate", updateContextualToolbar);
     editor.on("transaction", updateToolbar);
+    editor.on("transaction", updateContextualToolbar);
 
     // Also listen to mouseup for selection changes
     const handleMouseUp = () => {
-      setTimeout(updateToolbar, 10);
+      setTimeout(() => {
+        updateToolbar();
+        updateContextualToolbar();
+      }, 10);
     };
     document.addEventListener("mouseup", handleMouseUp);
 
     return () => {
       editor.off("selectionUpdate", updateToolbar);
+      editor.off("selectionUpdate", updateContextualToolbar);
       editor.off("transaction", updateToolbar);
+      editor.off("transaction", updateContextualToolbar);
       document.removeEventListener("mouseup", handleMouseUp);
     };
-  }, [editor, editable]);
+  }, [editor, editable, sectionContext]);
 
   // Track cursor position and line count based on visual lines
   useEffect(() => {
@@ -764,6 +848,25 @@ export const Editor = forwardRef<any, EditorProps>(function Editor(
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-[var(--bg-primary)] relative">
+      {/* Contextual Toolbar (Research-aware) - appears when cursor is in a section */}
+      {editable && showContextualToolbar && sectionContext && (
+        <ContextualToolbar
+          editor={editor}
+          context={sectionContext}
+          position={contextualToolbarPosition}
+          onAction={(action) => {
+            // Handle contextual actions
+            console.log(
+              "Contextual action:",
+              action,
+              "in section:",
+              sectionContext.sectionType
+            );
+            // TODO: Implement action handlers in Phase 2 completion
+          }}
+        />
+      )}
+
       {/* Floating Toolbar (Notion-style) - appears on text selection */}
       {editable && showFloatingToolbar && (
         <div
@@ -776,95 +879,95 @@ export const Editor = forwardRef<any, EditorProps>(function Editor(
           }}
         >
           {/* Bold */}
-            <ToolbarButton
+          <ToolbarButton
             onClick={() => {
               editor.chain().focus().toggleBold().run();
               setShowFloatingToolbar(false);
             }}
-              isActive={editor.isActive("bold")}
+            isActive={editor.isActive("bold")}
             title="Bold (⌘B)"
-            >
+          >
             <strong className="font-bold text-sm">B</strong>
-            </ToolbarButton>
+          </ToolbarButton>
 
           {/* Italic */}
-            <ToolbarButton
+          <ToolbarButton
             onClick={() => {
               editor.chain().focus().toggleItalic().run();
               setShowFloatingToolbar(false);
             }}
-              isActive={editor.isActive("italic")}
+            isActive={editor.isActive("italic")}
             title="Italic (⌘I)"
-            >
+          >
             <em className="italic text-sm">I</em>
-            </ToolbarButton>
+          </ToolbarButton>
 
           {/* Underline */}
-            <ToolbarButton
+          <ToolbarButton
             onClick={() => {
               editor.chain().focus().toggleUnderline().run();
               setShowFloatingToolbar(false);
             }}
-              isActive={editor.isActive("underline")}
+            isActive={editor.isActive("underline")}
             title="Underline (⌘U)"
-            >
+          >
             <u className="text-sm">U</u>
-            </ToolbarButton>
+          </ToolbarButton>
 
           {/* Strikethrough */}
-            <ToolbarButton
+          <ToolbarButton
             onClick={() => {
               editor.chain().focus().toggleStrike().run();
               setShowFloatingToolbar(false);
             }}
-              isActive={editor.isActive("strike")}
-              title="Strikethrough"
-            >
+            isActive={editor.isActive("strike")}
+            title="Strikethrough"
+          >
             <s className="text-sm">S</s>
-            </ToolbarButton>
+          </ToolbarButton>
 
           {/* Code */}
-            <ToolbarButton
+          <ToolbarButton
             onClick={() => {
               editor.chain().focus().toggleCode().run();
               setShowFloatingToolbar(false);
             }}
-              isActive={editor.isActive("code")}
+            isActive={editor.isActive("code")}
             title="Code"
-            >
+          >
             <span className="text-xs font-mono">&lt;/&gt;</span>
-            </ToolbarButton>
+          </ToolbarButton>
 
           <ToolbarSeparator />
 
           {/* Link */}
-            <ToolbarButton
+          <ToolbarButton
             onClick={() => {
               handleAddLink();
               setShowFloatingToolbar(false);
             }}
-              isActive={editor.isActive("link")}
+            isActive={editor.isActive("link")}
             title="Add Link"
           >
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-                <path
-                  d="M6.5 8.5C6.5 7.11929 7.61929 6 9 6H10.5C11.8807 6 13 7.11929 13 8.5C13 9.88071 11.8807 11 10.5 11H9C7.61929 11 6.5 9.88071 6.5 8.5Z"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                />
-                <path
-                  d="M9.5 8.5C9.5 9.88071 10.6193 11 12 11H13.5C14.8807 11 16 9.88071 16 8.5C16 7.11929 14.8807 6 13.5 6H12C10.6193 6 9.5 7.11929 9.5 8.5Z"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                />
-                <path
-                  d="M5 8.5H11"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                />
-              </svg>
-            </ToolbarButton>
+              <path
+                d="M6.5 8.5C6.5 7.11929 7.61929 6 9 6H10.5C11.8807 6 13 7.11929 13 8.5C13 9.88071 11.8807 11 10.5 11H9C7.61929 11 6.5 9.88071 6.5 8.5Z"
+                stroke="currentColor"
+                strokeWidth="1.5"
+              />
+              <path
+                d="M9.5 8.5C9.5 9.88071 10.6193 11 12 11H13.5C14.8807 11 16 9.88071 16 8.5C16 7.11929 14.8807 6 13.5 6H12C10.6193 6 9.5 7.11929 9.5 8.5Z"
+                stroke="currentColor"
+                strokeWidth="1.5"
+              />
+              <path
+                d="M5 8.5H11"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+              />
+            </svg>
+          </ToolbarButton>
 
           {/* Highlight */}
           <ToolbarButton
@@ -875,13 +978,15 @@ export const Editor = forwardRef<any, EditorProps>(function Editor(
             isActive={editor.isActive("highlight")}
             title="Highlight"
           >
-            <span className="px-1 text-xs text-black bg-yellow-400 rounded">H</span>
-            </ToolbarButton>
+            <span className="px-1 text-xs text-black bg-yellow-400 rounded">
+              H
+            </span>
+          </ToolbarButton>
 
           <ToolbarSeparator />
 
           {/* Heading 1 */}
-                <ToolbarButton
+          <ToolbarButton
             onClick={() => {
               editor.chain().focus().toggleHeading({ level: 1 }).run();
               setShowFloatingToolbar(false);
@@ -890,10 +995,10 @@ export const Editor = forwardRef<any, EditorProps>(function Editor(
             title="Heading 1"
           >
             <span className="text-xs font-bold">H1</span>
-                </ToolbarButton>
+          </ToolbarButton>
 
           {/* Heading 2 */}
-                <ToolbarButton
+          <ToolbarButton
             onClick={() => {
               editor.chain().focus().toggleHeading({ level: 2 }).run();
               setShowFloatingToolbar(false);
@@ -902,10 +1007,10 @@ export const Editor = forwardRef<any, EditorProps>(function Editor(
             title="Heading 2"
           >
             <span className="text-xs font-semibold">H2</span>
-                </ToolbarButton>
+          </ToolbarButton>
 
           {/* Heading 3 */}
-            <ToolbarButton
+          <ToolbarButton
             onClick={() => {
               editor.chain().focus().toggleHeading({ level: 3 }).run();
               setShowFloatingToolbar(false);
@@ -914,7 +1019,139 @@ export const Editor = forwardRef<any, EditorProps>(function Editor(
             title="Heading 3"
           >
             <span className="text-xs font-medium">H3</span>
+          </ToolbarButton>
+
+          <ToolbarSeparator />
+
+          {/* Font Size */}
+          <div className="relative group">
+            <ToolbarButton onClick={() => {}} title="Font Size">
+              <span className="text-xs">Aa</span>
             </ToolbarButton>
+            <div className="absolute top-full left-0 mt-1 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg shadow-xl py-1 min-w-[120px] z-50 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  editor.chain().focus().setFontSize("12px").run();
+                }}
+                className="w-full px-3 py-1.5 text-xs text-left hover:bg-[var(--bg-hover)]"
+              >
+                12px
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  editor.chain().focus().setFontSize("14px").run();
+                }}
+                className="w-full px-3 py-1.5 text-xs text-left hover:bg-[var(--bg-hover)]"
+              >
+                14px
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  editor.chain().focus().setFontSize("16px").run();
+                }}
+                className="w-full px-3 py-1.5 text-xs text-left hover:bg-[var(--bg-hover)]"
+              >
+                16px
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  editor.chain().focus().setFontSize("18px").run();
+                }}
+                className="w-full px-3 py-1.5 text-xs text-left hover:bg-[var(--bg-hover)]"
+              >
+                18px
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  editor.chain().focus().setFontSize("20px").run();
+                }}
+                className="w-full px-3 py-1.5 text-xs text-left hover:bg-[var(--bg-hover)]"
+              >
+                20px
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  editor.chain().focus().setFontSize("24px").run();
+                }}
+                className="w-full px-3 py-1.5 text-xs text-left hover:bg-[var(--bg-hover)]"
+              >
+                24px
+              </button>
+            </div>
+          </div>
+
+          {/* Text Alignment */}
+          <div className="relative group">
+            <ToolbarButton onClick={() => {}} title="Text Alignment">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                <path
+                  d="M2 4H14M2 8H14M2 12H10"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </ToolbarButton>
+            <div className="absolute top-full left-0 mt-1 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg shadow-xl py-1 min-w-[120px] z-50 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  editor.chain().focus().setTextAlign("left").run();
+                }}
+                className="w-full px-3 py-1.5 text-xs text-left hover:bg-[var(--bg-hover)] flex items-center gap-2"
+              >
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+                  <path
+                    d="M2 4H14M2 8H14M2 12H10"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                  />
+                </svg>
+                Left
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  editor.chain().focus().setTextAlign("center").run();
+                }}
+                className="w-full px-3 py-1.5 text-xs text-left hover:bg-[var(--bg-hover)] flex items-center gap-2"
+              >
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+                  <path
+                    d="M4 4H12M2 8H14M4 12H12"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                  />
+                </svg>
+                Center
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  editor.chain().focus().setTextAlign("right").run();
+                }}
+                className="w-full px-3 py-1.5 text-xs text-left hover:bg-[var(--bg-hover)] flex items-center gap-2"
+              >
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+                  <path
+                    d="M2 4H14M2 8H14M10 12H14"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                  />
+                </svg>
+                Right
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

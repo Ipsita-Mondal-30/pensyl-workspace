@@ -104,14 +104,14 @@ export function Sidebar({
 
   const getContextMenuItems = (section: Section): ContextMenuItem[] => {
     const items: ContextMenuItem[] = [
-      {
+        {
         id: "new-section",
         label: "New Section",
-        icon: <PlusIcon />,
-        onClick: () => {
+          icon: <PlusIcon />,
+          onClick: () => {
           onNewSection?.(section.id);
+          },
         },
-      },
       { id: "sep1", label: "", separator: true, onClick: () => {} },
       {
         id: "rename",
@@ -314,17 +314,17 @@ export function Sidebar({
           <div className="flex items-center gap-1">
             {/* New File Button - Cursor style */}
             {currentFolder && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
                   setShowNewSectionDialog(true);
-                }}
-                className="w-6 h-6 flex items-center justify-center hover:bg-[var(--bg-hover)] rounded transition-all duration-200 ease-in-out shrink-0 text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                  }}
+                  className="w-6 h-6 flex items-center justify-center hover:bg-[var(--bg-hover)] rounded transition-all duration-200 ease-in-out shrink-0 text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                 aria-label="New section"
                 title="New section"
-              >
-                <PlusIcon className="w-4 h-4" />
-              </button>
+                >
+                  <PlusIcon className="w-4 h-4" />
+                </button>
             )}
             <button
               onClick={toggleCollapse}
