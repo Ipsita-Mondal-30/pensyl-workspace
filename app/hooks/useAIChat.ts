@@ -1,7 +1,7 @@
 "use client";
 import { useState, useCallback } from 'react';
 import { Editor } from '@tiptap/react';
-import { streamMessageToGemini } from '../services/gemini';
+import { streamAIMessage, type ChatMessage as AIChatMessage } from '../services/ai-service';
 import { localStorageFS } from '../lib/localStorageFS';
 
 export interface ChatMessage {
@@ -86,8 +86,8 @@ export function useAIChat() {
                 }
             }
 
-            // Build messages array for Gemini
-            const messages = [
+            // Build messages array for AI service (orchestration or Gemini)
+            const messages: AIChatMessage[] = [
                 ...chatHistory.slice(-5).map(msg => ({
                     role: msg.role as 'user' | 'assistant',
                     content: msg.content,
@@ -98,8 +98,17 @@ export function useAIChat() {
                 },
             ];
 
-            // Stream response
-            for await (const chunk of streamMessageToGemini(messages)) {
+            // Stream response using unified AI service (orchestration by default)
+            for await (const chunk of streamAIMessage(messages, {
+                context: options.currentFileName 
+                    ? `Context: Editing ${options.currentFileName}${options.cursorInfo ? ` at line ${options.cursorInfo.line}` : ''}`
+                    : undefined,
+                metadata: {
+                    currentFile: options.currentFileName,
+                    currentFilePath: options.currentFilePath,
+                    workspacePath: options.workspacePath,
+                },
+            })) {
                 yield chunk;
             }
         } catch (error: any) {
