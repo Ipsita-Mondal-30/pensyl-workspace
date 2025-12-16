@@ -202,6 +202,8 @@ export const Editor = forwardRef<any, EditorProps>(function Editor(
     if (!editor || !editable || !editorContentRef.current) return;
 
     const updateToolbar = () => {
+      if (!editorContentRef.current) return;
+      
       const { state } = editor.view;
       const { selection } = state;
       const { from, to } = selection;
