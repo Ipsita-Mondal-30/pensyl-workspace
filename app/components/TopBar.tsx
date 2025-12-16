@@ -9,6 +9,10 @@ interface TopBarProps {
   onExport?: (format: "pdf" | "docx" | "latex" | "markdown") => void;
   onInsert?: (type: "title" | "abstract" | "introduction" | "methods" | "results" | "discussion" | "conclusion" | "figure" | "equation" | "citation" | "table") => void;
   onFormat?: (action: "bold" | "italic" | "underline" | "heading1" | "heading2" | "heading3" | "bulletList" | "orderedList" | "blockquote" | "codeBlock") => void;
+  onViewModeChange?: (mode: "writing" | "paper" | "latex") => void;
+  currentViewMode?: "writing" | "paper" | "latex";
+  onToggleToC?: () => void;
+  showToC?: boolean;
 }
 
 /**
@@ -22,6 +26,10 @@ export function TopBar({
   onExport,
   onInsert,
   onFormat,
+  onViewModeChange,
+  currentViewMode = "writing",
+  onToggleToC,
+  showToC = false,
 }: TopBarProps = {}) {
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const dropdownRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
@@ -72,7 +80,7 @@ export function TopBar({
     hasDropdown?: boolean;
     children?: React.ReactNode;
   }) => (
-    <div className="relative">
+    <div className="relative" style={{ zIndex: 10001 }}>
       <button
         onClick={(e) => {
           e.stopPropagation();
@@ -86,35 +94,37 @@ export function TopBar({
           e.stopPropagation();
         }}
         className={`
-          flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium
+          flex items-center gap-1.5 px-2 py-1.5 rounded-md text-xs font-medium whitespace-nowrap
           transition-all duration-150
+          ${!label ? "px-1.5" : ""}
           ${
             openDropdown === id
               ? "bg-[var(--bg-active)] text-[var(--text-primary)]"
               : "text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
           }
         `}
+        title={label || id}
       >
         {icon}
-        <span>{label}</span>
+        {label && <span>{label}</span>}
         {hasDropdown && (
           <svg
             width="12"
             height="12"
             viewBox="0 0 12 12"
-            fill="none"
+    fill="none"
             className={`transition-transform duration-150 ${
               openDropdown === id ? "rotate-180" : ""
             }`}
           >
-            <path
+    <path
               d="M3 4.5L6 7.5L9 4.5"
-              stroke="currentColor"
+      stroke="currentColor"
               strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
         )}
       </button>
       {hasDropdown && openDropdown === id && children && (
@@ -128,7 +138,8 @@ export function TopBar({
           onMouseDown={(e) => {
             e.stopPropagation();
           }}
-          className="absolute top-full left-0 mt-1 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg shadow-xl py-1.5 min-w-[200px] z-50"
+          style={{ zIndex: 10002 }}
+          className="absolute top-full left-0 mt-1 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg shadow-xl py-1.5 min-w-[200px]"
         >
           {children}
         </div>
@@ -161,7 +172,7 @@ export function TopBar({
         e.stopPropagation();
       }}
       className="w-full flex items-center gap-2 px-3 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors text-left"
-    >
+  >
       {icon && (
         <span className="w-4 h-4 flex items-center justify-center">{icon}</span>
       )}
@@ -175,22 +186,22 @@ export function TopBar({
   );
 
   return (
-    <div className="flex items-center justify-between h-11 bg-[var(--bg-secondary)] border-b border-[var(--border-primary)] px-4 select-none">
+    <div className="flex items-center justify-between h-14 bg-[var(--bg-secondary)] border-b border-[var(--border-primary)] px-3 select-none relative z-[10000]">
       {/* Left: Core Features */}
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-0.5 flex-1 min-w-0">
         {/* 0. Insert - Research Paper Elements */}
         <TopBarButton
           id="insert"
           label="Insert"
           icon={
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <path
+    <path
                 d="M8 3V13M3 8H13"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-              />
-            </svg>
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+    />
+  </svg>
           }
           hasDropdown={true}
         >
@@ -269,13 +280,13 @@ export function TopBar({
           label="Add Source"
           icon={
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <path
+    <path
                 d="M8 3V13M3 8H13"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-              />
-            </svg>
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+    />
+  </svg>
           }
           hasDropdown={true}
         >
@@ -304,10 +315,10 @@ export function TopBar({
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
               <path
                 d="M4 6C4 4.89543 4.89543 4 6 4H10C11.1046 4 12 4.89543 12 6V10C12 11.1046 11.1046 12 10 12H6C4.89543 12 4 11.1046 4 10V6Z"
-                stroke="currentColor"
-                strokeWidth="1.5"
-              />
-            </svg>
+      stroke="currentColor"
+      strokeWidth="1.5"
+    />
+  </svg>
           }
           hasDropdown={true}
         >
@@ -326,21 +337,21 @@ export function TopBar({
         {/* 3. Ask AI */}
         <TopBarButton
           id="ask-ai"
-          label="Ask AI"
+          label="AI"
           icon={
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
               <path
                 d="M8 2C4.68629 2 2 4.68629 2 8C2 11.3137 4.68629 14 8 14C11.3137 14 14 11.3137 14 8C14 4.68629 11.3137 2 8 2Z"
-                stroke="currentColor"
-                strokeWidth="1.5"
-              />
+      stroke="currentColor"
+      strokeWidth="1.5"
+    />
               <path
                 d="M8 5V8M8 11H8.01"
-                stroke="currentColor"
-                strokeWidth="1.5"
+      stroke="currentColor"
+      strokeWidth="1.5"
                 strokeLinecap="round"
-              />
-            </svg>
+    />
+  </svg>
           }
           hasDropdown={true}
           onClick={onOpenAI}
@@ -354,7 +365,7 @@ export function TopBar({
         {/* 4. Research Tools */}
         <TopBarButton
           id="research"
-          label="Research"
+          label="Search"
           icon={
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
               <circle
@@ -364,13 +375,13 @@ export function TopBar({
                 stroke="currentColor"
                 strokeWidth="1.5"
               />
-              <path
+    <path
                 d="M10 10L13 13"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-              />
-            </svg>
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+    />
+  </svg>
           }
           hasDropdown={true}
         >
@@ -398,12 +409,14 @@ export function TopBar({
               />
             </svg>
           }
-          onClick={() => {
-            // Toggle audio playback
-          }}
-        />
+          hasDropdown={true}
+        >
+          <DropdownItem label="Convert to audio" onClick={() => {}} />
+          <DropdownItem label="Play / Pause" onClick={() => {}} />
+          <DropdownItem label="Speed control" onClick={() => {}} />
+        </TopBarButton>
 
-        {/* 6. Humanize - Auto-Format Everything */}
+        {/* 6. Humanize */}
         <TopBarButton
           id="humanize"
           label="Humanize"
@@ -466,7 +479,7 @@ export function TopBar({
           }}
         />
 
-        {/* 8. Format - Make formatting more accessible */}
+        {/* 8. Format */}
         <TopBarButton
           id="format"
           label="Format"
@@ -571,7 +584,7 @@ export function TopBar({
           <DropdownItem label="Math blocks manager" onClick={() => {}} />
         </TopBarButton>
 
-        {/* 9. Export */}
+        {/* 10. Export */}
         <TopBarButton
           id="export"
           label="Export"
@@ -608,7 +621,45 @@ export function TopBar({
       </div>
 
       {/* Right: Optional Icons */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1.5 flex-shrink-0">
+        {/* View Mode Toggle - Moved here from top */}
+        {onViewModeChange && (
+          <div className="flex items-center gap-0.5 bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded p-0.5 mr-1">
+            <button
+              onClick={() => onViewModeChange("writing")}
+              className={`px-1.5 py-1 text-xs font-medium rounded transition-colors ${
+                currentViewMode === "writing"
+                  ? "bg-[var(--accent-primary)] text-white"
+                  : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
+              }`}
+              title="Writing Mode"
+            >
+              ✍️
+            </button>
+            <button
+              onClick={() => onViewModeChange("paper")}
+              className={`px-2 py-1 text-xs font-medium rounded transition-colors ${
+                currentViewMode === "paper"
+                  ? "bg-[var(--accent-primary)] text-white"
+                  : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
+              }`}
+              title="Paper Preview"
+            >
+              📄
+            </button>
+            <button
+              onClick={() => onViewModeChange("latex")}
+              className={`px-2 py-1 text-xs font-medium rounded transition-colors ${
+                currentViewMode === "latex"
+                  ? "bg-[var(--accent-primary)] text-white"
+                  : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
+              }`}
+              title="LaTeX Preview"
+            >
+              ∑
+          </button>
+          </div>
+        )}
         {/* Version History */}
         <button
           className="w-8 h-8 flex items-center justify-center text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] rounded transition-colors"
@@ -633,7 +684,7 @@ export function TopBar({
 
         {/* Collaborators */}
         <button
-          className="w-8 h-8 flex items-center justify-center text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] rounded transition-colors"
+          className="w-7 h-7 flex items-center justify-center text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] rounded transition-colors"
           title="Collaborators"
         >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -666,10 +717,30 @@ export function TopBar({
           </svg>
         </button>
 
+        {/* Table of Contents Toggle */}
+        {onToggleToC && (
+          <button
+            onClick={onToggleToC}
+            className={`w-7 h-7 flex items-center justify-center text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] rounded transition-colors ${
+              showToC ? "bg-[var(--bg-active)] text-[var(--text-primary)]" : ""
+            }`}
+            title="Toggle Table of Contents"
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path
+                d="M2 4H8M2 8H14M2 12H10"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+              />
+            </svg>
+          </button>
+        )}
+
         {/* Settings */}
         <button
           onClick={onOpenSettings}
-          className="w-8 h-8 flex items-center justify-center text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] rounded transition-colors"
+          className="w-7 h-7 flex items-center justify-center text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] rounded transition-colors"
           title="Project settings"
         >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">

@@ -56,9 +56,12 @@ export const FontSize = Extension.create<FontSizeOptions>({
     return {
       setFontSize:
         (fontSize: string) =>
-        ({ chain }) => {
+        ({ chain, state }) => {
+          const { selection } = state;
+          const { from, to } = selection;
+          
           return chain()
-            .setMark("textStyle", { fontSize })
+            .setMark("textStyle", { fontSize: fontSize.includes("px") ? fontSize : `${fontSize}px` })
             .run();
         },
       unsetFontSize:

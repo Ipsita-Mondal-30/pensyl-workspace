@@ -90,6 +90,9 @@ function App() {
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [analytics, setAnalytics] = useState<any>(null);
 
+  // Table of Contents toggle state
+  const [showToC, setShowToC] = useState(false);
+
   // Insert dialog state
   const [showFigureDialog, setShowFigureDialog] = useState(false);
   const [showMathDialog, setShowMathDialog] = useState(false);
@@ -1091,6 +1094,10 @@ function App() {
         onExport={handleExport}
         onInsert={handleInsert}
         onFormat={handleFormat}
+        onViewModeChange={setViewMode}
+        currentViewMode={viewMode}
+        onToggleToC={() => setShowToC(!showToC)}
+        showToC={showToC}
         onAddSource={(type) => {
           console.log("Add source:", type);
           // TODO: Implement source addition
@@ -1135,14 +1142,6 @@ function App() {
                 const activeTab = tabs.find((t) => t.id === activeTabId);
                 return activeTab ? (
                   <>
-                    {/* View Mode Toggle */}
-                    <div className="flex items-center justify-end px-4 py-2 border-b border-[var(--border-primary)]">
-                      <ViewModeToggle
-                        editor={editorRef.current}
-                        currentMode={viewMode}
-                        onModeChange={setViewMode}
-                      />
-                    </div>
                     <Editor
                       ref={editorRef}
                       content={activeTab.content || ""}
@@ -1272,8 +1271,8 @@ function App() {
         </div>
       )}
 
-      {/* Auto Table of Contents (can be shown in sidebar or as floating panel) */}
-      {activeTabId && editorRef.current && (
+      {/* Auto Table of Contents - Toggleable */}
+      {activeTabId && editorRef.current && showToC && (
         <div className="fixed top-20 right-4 w-64 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg shadow-lg p-4 z-40 max-h-[60vh] overflow-y-auto">
           <AutoToC
             editor={editorRef.current}

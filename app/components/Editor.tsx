@@ -191,12 +191,12 @@ export const Editor = forwardRef<any, EditorProps>(function Editor(
         },
       }),
       Underline,
+      TextStyle,
       FontSize,
       TextAlign.configure({
         types: ["heading", "paragraph"],
       }),
       Color,
-      TextStyle,
       Highlight.configure({
         multicolor: true,
       }),
@@ -1026,62 +1026,129 @@ export const Editor = forwardRef<any, EditorProps>(function Editor(
           {/* Font Size */}
           <div className="relative group">
             <ToolbarButton onClick={() => {}} title="Font Size">
-              <span className="text-xs">Aa</span>
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                <path
+                  d="M4 2V14M8 2V14M12 2V14"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                />
+                <path
+                  d="M2 4H6M2 8H10M2 12H14"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                />
+              </svg>
             </ToolbarButton>
-            <div className="absolute top-full left-0 mt-1 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg shadow-xl py-1 min-w-[120px] z-50 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all">
+            <div className="absolute top-full left-0 mt-1 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg shadow-xl py-1 min-w-[100px] max-h-[300px] overflow-y-auto z-50 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all">
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  editor.chain().focus().setFontSize("12px").run();
+                  (editor.commands as any).setFontSize("12");
                 }}
                 className="w-full px-3 py-1.5 text-xs text-left hover:bg-[var(--bg-hover)]"
               >
-                12px
+                12
               </button>
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  editor.chain().focus().setFontSize("14px").run();
+                  (editor.commands as any).setFontSize("14");
                 }}
                 className="w-full px-3 py-1.5 text-xs text-left hover:bg-[var(--bg-hover)]"
               >
-                14px
+                14
               </button>
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  editor.chain().focus().setFontSize("16px").run();
+                  (editor.commands as any).setFontSize("16");
                 }}
                 className="w-full px-3 py-1.5 text-xs text-left hover:bg-[var(--bg-hover)]"
               >
-                16px
+                16
               </button>
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  editor.chain().focus().setFontSize("18px").run();
+                  (editor.commands as any).setFontSize("18");
                 }}
                 className="w-full px-3 py-1.5 text-xs text-left hover:bg-[var(--bg-hover)]"
               >
-                18px
+                18
               </button>
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  editor.chain().focus().setFontSize("20px").run();
+                  (editor.commands as any).setFontSize("20");
                 }}
                 className="w-full px-3 py-1.5 text-xs text-left hover:bg-[var(--bg-hover)]"
               >
-                20px
+                20
               </button>
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  editor.chain().focus().setFontSize("24px").run();
+                  (editor.commands as any).setFontSize("24");
                 }}
                 className="w-full px-3 py-1.5 text-xs text-left hover:bg-[var(--bg-hover)]"
               >
-                24px
+                24
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  (editor.commands as any).setFontSize("28");
+                }}
+                className="w-full px-3 py-1.5 text-xs text-left hover:bg-[var(--bg-hover)]"
+              >
+                28
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  (editor.commands as any).setFontSize("32");
+                }}
+                className="w-full px-3 py-1.5 text-xs text-left hover:bg-[var(--bg-hover)]"
+              >
+                32
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  (editor.commands as any).setFontSize("36");
+                }}
+                className="w-full px-3 py-1.5 text-xs text-left hover:bg-[var(--bg-hover)]"
+              >
+                36
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  (editor.commands as any).setFontSize("48");
+                }}
+                className="w-full px-3 py-1.5 text-xs text-left hover:bg-[var(--bg-hover)]"
+              >
+                48
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  (editor.commands as any).setFontSize("60");
+                }}
+                className="w-full px-3 py-1.5 text-xs text-left hover:bg-[var(--bg-hover)]"
+              >
+                60
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  (editor.commands as any).setFontSize("72");
+                }}
+                className="w-full px-3 py-1.5 text-xs text-left hover:bg-[var(--bg-hover)]"
+              >
+                72
               </button>
             </div>
           </div>
