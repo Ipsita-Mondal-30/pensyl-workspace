@@ -33,37 +33,54 @@ export function TopBar({
 }: TopBarProps = {}) {
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const dropdownRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
+  const ignoreNextClickRef = useRef(false);
+
+  const toggleDropdown = (id: string) => {
+    // Use functional update to avoid race conditions
+    setOpenDropdown((current) => {
+      if (current === id) {
+        return null;
+      }
+      return id;
+    });
+  };
 
   // Close dropdowns when clicking outside
   useEffect(() => {
+    if (!openDropdown) return;
+
     const handleClickOutside = (event: MouseEvent) => {
-      if (openDropdown) {
-        const dropdown = dropdownRefs.current[openDropdown];
-        const target = event.target as Node;
-        if (dropdown && !dropdown.contains(target)) {
-          // Also check if the click is on the button itself
-          const button = (event.target as HTMLElement)?.closest('button');
-          if (!button || !button.closest('.relative')) {
-            setOpenDropdown(null);
-          }
-        }
+      // Ignore if we're in the middle of a button click
+      if (ignoreNextClickRef.current) {
+        ignoreNextClickRef.current = false;
+        return;
       }
+
+      const target = event.target as HTMLElement;
+      if (!target) return;
+
+      const dropdown = dropdownRefs.current[openDropdown];
+      const buttonContainer = target.closest(`[data-dropdown-container="${openDropdown}"]`);
+
+      // If click is inside the dropdown or its button container, don't close
+      if (dropdown?.contains(target) || buttonContainer) {
+        return;
+      }
+
+      // Click is outside, close dropdown
+      setOpenDropdown(null);
     };
 
-    // Use a small delay to allow click events to process first
+    // Use a longer delay to ensure button clicks are processed first
     const timeoutId = setTimeout(() => {
-      document.addEventListener("mousedown", handleClickOutside);
-    }, 0);
+      document.addEventListener("click", handleClickOutside, true);
+    }, 300);
 
     return () => {
       clearTimeout(timeoutId);
-      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("click", handleClickOutside, true);
     };
   }, [openDropdown]);
-
-  const toggleDropdown = (id: string) => {
-    setOpenDropdown(openDropdown === id ? null : id);
-  };
 
   const TopBarButton = ({
     id,
@@ -80,12 +97,25 @@ export function TopBar({
     hasDropdown?: boolean;
     children?: React.ReactNode;
   }) => (
-    <div className="relative" style={{ zIndex: 10001 }}>
+    <div 
+      className="relative" 
+      style={{ zIndex: 10001 }} 
+      data-topbar-button
+      data-dropdown-container={id}
+    >
       <button
+        data-dropdown-id={id}
         onClick={(e) => {
           e.stopPropagation();
+          e.preventDefault();
           if (hasDropdown) {
+            // Set flag to ignore the next click outside event
+            ignoreNextClickRef.current = true;
             toggleDropdown(id);
+            // Reset flag after click is processed
+            setTimeout(() => {
+              ignoreNextClickRef.current = false;
+            }, 100);
           } else {
             onClick?.();
           }
@@ -159,17 +189,17 @@ export function TopBar({
     shortcut?: string;
   }) => (
     <button
+      onMouseDown={(e) => {
+        e.stopPropagation();
+      }}
       onClick={(e) => {
         e.stopPropagation();
         e.preventDefault();
         onClick();
-        // Small delay before closing to ensure click is processed
+        // Close dropdown after action completes
         setTimeout(() => {
           setOpenDropdown(null);
-        }, 100);
-      }}
-      onMouseDown={(e) => {
-        e.stopPropagation();
+        }, 10);
       }}
       className="w-full flex items-center gap-2 px-3 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors text-left"
   >
