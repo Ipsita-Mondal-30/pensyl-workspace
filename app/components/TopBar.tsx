@@ -1,5 +1,5 @@
 "use client";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback, memo } from "react";
 
 interface TopBarProps {
   onOpenSettings?: () => void;
@@ -35,7 +35,7 @@ export function TopBar({
   const dropdownRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
   const ignoreNextClickRef = useRef(false);
 
-  const toggleDropdown = (id: string) => {
+  const toggleDropdown = useCallback((id: string) => {
     // Use functional update to avoid race conditions
     setOpenDropdown((current) => {
       if (current === id) {
@@ -43,7 +43,7 @@ export function TopBar({
       }
       return id;
     });
-  };
+  }, []);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -82,13 +82,15 @@ export function TopBar({
     };
   }, [openDropdown]);
 
-  const TopBarButton = ({
+  const TopBarButton = memo(({
     id,
     label,
     icon,
     onClick,
     hasDropdown = false,
     children,
+    isOpen,
+    onToggle,
   }: {
     id: string;
     label: string;
@@ -96,86 +98,115 @@ export function TopBar({
     onClick?: () => void;
     hasDropdown?: boolean;
     children?: React.ReactNode;
-  }) => (
-    <div 
-      className="relative" 
-      style={{ zIndex: 10001 }} 
-      data-topbar-button
-      data-dropdown-container={id}
-    >
-      <button
-        data-dropdown-id={id}
-        onClick={(e) => {
-          e.stopPropagation();
-          e.preventDefault();
-          if (hasDropdown) {
-            // Set flag to ignore the next click outside event
-            ignoreNextClickRef.current = true;
-            toggleDropdown(id);
-            // Reset flag after click is processed
-            setTimeout(() => {
-              ignoreNextClickRef.current = false;
-            }, 100);
-          } else {
-            onClick?.();
-          }
-        }}
-        onMouseDown={(e) => {
-          e.stopPropagation();
-        }}
-        className={`
-          flex items-center gap-1.5 px-2 py-1.5 rounded-md text-xs font-medium whitespace-nowrap
-          transition-all duration-150
-          ${!label ? "px-1.5" : ""}
-          ${
-            openDropdown === id
-              ? "bg-[var(--bg-active)] text-[var(--text-primary)]"
-              : "text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
-          }
-        `}
-        title={label || id}
+    isOpen: boolean;
+    onToggle: (id: string) => void;
+  }) => {
+    const paddingClass = !label ? "px-1.5" : "px-2";
+    const stateClass = isOpen ? "topbar-button-active" : "";
+    const buttonClassName = `topbar-button ${paddingClass} ${stateClass}`.trim();
+    
+    return (
+      <div 
+        className="relative" 
+        style={{ zIndex: 10001 }} 
+        data-topbar-button
+        data-dropdown-container={id}
       >
-        {icon}
-        {label && <span>{label}</span>}
-        {hasDropdown && (
-          <svg
-            width="12"
-            height="12"
-            viewBox="0 0 12 12"
-    fill="none"
-            className={`transition-transform duration-150 ${
-              openDropdown === id ? "rotate-180" : ""
-            }`}
-          >
-    <path
-              d="M3 4.5L6 7.5L9 4.5"
-      stroke="currentColor"
-              strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  </svg>
-        )}
-      </button>
-      {hasDropdown && openDropdown === id && children && (
-        <div
-          ref={(el) => {
-            dropdownRefs.current[id] = el;
-          }}
+        <button
+          data-dropdown-id={id}
+          data-is-open={isOpen ? "true" : "false"}
           onClick={(e) => {
             e.stopPropagation();
+            e.preventDefault();
+            if (hasDropdown) {
+              // Set flag to ignore the next click outside event
+              ignoreNextClickRef.current = true;
+              onToggle(id);
+              // Reset flag after click is processed
+              setTimeout(() => {
+                ignoreNextClickRef.current = false;
+              }, 100);
+            } else {
+              onClick?.();
+            }
           }}
           onMouseDown={(e) => {
             e.stopPropagation();
           }}
-          style={{ zIndex: 10002 }}
-          className="absolute top-full left-0 mt-1 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg shadow-xl py-1.5 min-w-[200px]"
+          className={buttonClassName}
+          style={{
+            paddingLeft: !label ? '0.375rem' : '0.5rem',
+            paddingRight: !label ? '0.375rem' : '0.5rem',
+          }}
+          onMouseEnter={(e) => {
+            // Prevent any React re-renders on hover
+            e.currentTarget.style.backgroundColor = 'var(--bg-hover)';
+            e.currentTarget.style.color = 'var(--text-primary)';
+          }}
+          onMouseLeave={(e) => {
+            // Restore original state
+            if (!isOpen) {
+              e.currentTarget.style.backgroundColor = 'transparent';
+              e.currentTarget.style.color = 'var(--text-secondary)';
+            } else {
+              e.currentTarget.style.backgroundColor = 'var(--bg-active)';
+              e.currentTarget.style.color = 'var(--text-primary)';
+            }
+          }}
+          title={label || id}
         >
-          {children}
-        </div>
-      )}
-    </div>
-  );
+          {icon}
+          {label && <span>{label}</span>}
+          {hasDropdown && (
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 12 12"
+    fill="none"
+              className={`transition-transform duration-150 ${
+                isOpen ? "rotate-180" : ""
+              }`}
+            >
+    <path
+                d="M3 4.5L6 7.5L9 4.5"
+      stroke="currentColor"
+                strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+          )}
+        </button>
+        {hasDropdown && isOpen && children && (
+          <div
+            ref={(el) => {
+              dropdownRefs.current[id] = el;
+            }}
+            onClick={(e) => {
+              e.stopPropagation();
+            }}
+            onMouseDown={(e) => {
+              e.stopPropagation();
+            }}
+            style={{ zIndex: 10002 }}
+            className="absolute top-full left-0 mt-1 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg shadow-xl py-1.5 min-w-[200px]"
+          >
+            {children}
+          </div>
+        )}
+      </div>
+    );
+  }, (prevProps, nextProps) => {
+    // Only re-render if these specific props change
+    return (
+      prevProps.id === nextProps.id &&
+      prevProps.label === nextProps.label &&
+      prevProps.isOpen === nextProps.isOpen &&
+      prevProps.hasDropdown === nextProps.hasDropdown &&
+      prevProps.onClick === nextProps.onClick &&
+      prevProps.onToggle === nextProps.onToggle
+    );
+  });
 
   const DropdownItem = ({
     icon,
@@ -201,7 +232,7 @@ export function TopBar({
           setOpenDropdown(null);
         }, 10);
       }}
-      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors text-left"
+      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors duration-200 ease-in-out text-left"
   >
       {icon && (
         <span className="w-4 h-4 flex items-center justify-center">{icon}</span>
@@ -234,6 +265,8 @@ export function TopBar({
   </svg>
           }
           hasDropdown={true}
+          isOpen={openDropdown === "insert"}
+          onToggle={toggleDropdown}
         >
           <div className="px-2 py-1.5 text-xs font-semibold text-[var(--text-secondary)] uppercase">
             Document Structure
@@ -319,6 +352,8 @@ export function TopBar({
   </svg>
           }
           hasDropdown={true}
+          isOpen={openDropdown === "add-source"}
+          onToggle={toggleDropdown}
         >
           <DropdownItem
             icon="📄"
@@ -351,6 +386,8 @@ export function TopBar({
   </svg>
           }
           hasDropdown={true}
+          isOpen={openDropdown === "cite"}
+          onToggle={toggleDropdown}
         >
           <DropdownItem
             label="Insert in-text citation at cursor"
@@ -385,6 +422,8 @@ export function TopBar({
           }
           hasDropdown={true}
           onClick={onOpenAI}
+          isOpen={openDropdown === "ask-ai"}
+          onToggle={toggleDropdown}
         >
           <DropdownItem label="Rewrite section" onClick={() => {}} />
           <DropdownItem label="Explain concept" onClick={() => {}} />
@@ -414,6 +453,8 @@ export function TopBar({
   </svg>
           }
           hasDropdown={true}
+          isOpen={openDropdown === "research"}
+          onToggle={toggleDropdown}
         >
           <DropdownItem
             label="Search papers (Semantic Scholar)"
@@ -440,6 +481,8 @@ export function TopBar({
             </svg>
           }
           hasDropdown={true}
+          isOpen={openDropdown === "listen"}
+          onToggle={toggleDropdown}
         >
           <DropdownItem label="Convert to audio" onClick={() => {}} />
           <DropdownItem label="Play / Pause" onClick={() => {}} />
@@ -474,6 +517,8 @@ export function TopBar({
             </svg>
           }
           hasDropdown={true}
+          isOpen={openDropdown === "humanize"}
+          onToggle={toggleDropdown}
         >
           <DropdownItem label="Fix formatting everywhere" onClick={() => {}} />
           <DropdownItem label="Match journal style" onClick={() => {}} />
@@ -507,6 +552,8 @@ export function TopBar({
             // Research Gap Finder action
             console.log("Find research gaps");
           }}
+          isOpen={false}
+          onToggle={toggleDropdown}
         />
 
         {/* 8. Format */}
@@ -524,6 +571,8 @@ export function TopBar({
             </svg>
           }
           hasDropdown={true}
+          isOpen={openDropdown === "format"}
+          onToggle={toggleDropdown}
         >
           <div className="px-2 py-1.5 text-xs font-semibold text-[var(--text-secondary)] uppercase">
             Text Formatting
@@ -607,6 +656,8 @@ export function TopBar({
             </svg>
           }
           hasDropdown={true}
+          isOpen={openDropdown === "latex"}
+          onToggle={toggleDropdown}
         >
           <DropdownItem label="Toggle LaTeX view" onClick={() => {}} />
           <DropdownItem label="Export to LaTeX" onClick={() => {}} />
@@ -636,6 +687,8 @@ export function TopBar({
             </svg>
           }
           hasDropdown={true}
+          isOpen={openDropdown === "export"}
+          onToggle={toggleDropdown}
         >
           <DropdownItem
             label="PDF (submission-ready)"
