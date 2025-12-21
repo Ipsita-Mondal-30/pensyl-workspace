@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { DiffViewer } from "./DiffViewer";
-import type { Patch } from "../utils/patchParser";
+import type { Patch } from "../../utils/patchParser";
 
 interface PatchPreviewProps {
   patches: Patch[];

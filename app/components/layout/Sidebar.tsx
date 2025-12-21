@@ -1,10 +1,10 @@
 "use client";
 import { useState } from "react";
-import { ChevronRightIcon, FolderIcon, FileIcon, PlusIcon, EditIcon, TrashIcon } from "./Icons";
-import { ContextMenu, type ContextMenuItem } from "./ContextMenu";
-import { NewFileDialog } from "./NewFileDialog";
-import type { FileItem } from "../shared/types";
-import type { Section } from "../utils/sectionParser";
+import { ChevronRightIcon, FolderIcon, FileIcon, PlusIcon, EditIcon, TrashIcon } from "../ui/Icons";
+import { ContextMenu, type ContextMenuItem } from "../ui/ContextMenu";
+import { NewFileDialog } from "../dialogs/NewFileDialog";
+import type { FileItem } from "../../shared/types";
+import type { Section } from "../../utils/sectionParser";
 
 interface SidebarProps {
   currentFolder?: string;

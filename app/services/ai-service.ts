@@ -3,15 +3,14 @@
 /**
  * Unified AI Service
  * 
- * Supports both:
- * 1. Backend Orchestration API (default) - Uses OpenRouter models via orchestration layer
- * 2. Gemini Direct API (fallback) - Direct Gemini API calls
+ * Now uses Backend AI API (OpenRouter models via backend)
+ * Falls back to Gemini Direct API if backend is unavailable
  */
 
 import { streamMessageToGemini, type ChatMessage as GeminiChatMessage } from './gemini';
-import { aiOrchestrationClient } from '../lib/ai-orchestration-client';
+import { streamAI, type BackendModel } from './backend-ai.service';
 
-export type AIProvider = 'orchestration' | 'gemini';
+export type AIProvider = 'backend' | 'gemini';
 
 export interface ChatMessage {
   role: "user" | "assistant";
@@ -22,18 +21,19 @@ export interface StreamOptions {
   provider?: AIProvider;
   context?: string;
   metadata?: Record<string, any>;
+  selectedModelId?: string; // Model ID from backend model registry
 }
 
 /**
- * Get the configured AI provider (default: orchestration with Gemini as fallback)
+ * Get the configured AI provider (default: backend with Gemini as fallback)
  */
 function getDefaultProvider(): AIProvider {
   if (typeof window === 'undefined') {
-    return 'orchestration';
+    return 'backend';
   }
   
   const stored = localStorage.getItem('intellirite_ai_provider');
-  return (stored === 'gemini' || stored === 'orchestration') ? stored : 'orchestration';
+  return (stored === 'gemini' || stored === 'backend') ? stored : 'backend';
 }
 
 /**
@@ -46,10 +46,9 @@ export function setAIProvider(provider: AIProvider): void {
 }
 
 /**
- * Stream a message using the backend orchestration API
- * This uses the agent orchestration layer with OpenRouter models
+ * Stream a message using the backend AI API (OpenRouter models)
  */
-async function* streamMessageViaOrchestration(
+async function* streamMessageViaBackend(
   messages: ChatMessage[],
   options: StreamOptions = {}
 ): AsyncGenerator<string, void, unknown> {
@@ -66,57 +65,26 @@ async function* streamMessageViaOrchestration(
     : options.context;
 
   try {
-    // Call orchestration API
-    const response = await aiOrchestrationClient.orchestrate({
-      prompt: lastMessage.content,
-      context,
-      metadata: {
-        ...options.metadata,
-        messageHistory: contextMessages.length,
-      },
-    });
-
-    // Simulate streaming by chunking the response
-    // In the future, the backend can support SSE streaming
-    const output = response.output || '';
-    const chunks = output.split(' ');
-    
-    for (let i = 0; i < chunks.length; i++) {
-      const chunk = chunks[i] + (i < chunks.length - 1 ? ' ' : '');
-      yield chunk;
-      
-      // Small delay to simulate streaming
-      if (i < chunks.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, 10));
-      }
-    }
-
-    // Log orchestration details for debugging
-    console.log('🤖 Orchestration Response:', {
-      intent: response.intent,
-      agents: response.agents,
-      confidence: response.metadata?.confidence,
-      reasoning: response.metadata?.reasoning,
-      agentOutputs: Object.keys(response.agentOutputs || {}),
-    });
-
-    // Store orchestration metadata for UI display
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('ai-orchestration-complete', {
-        detail: {
-          intent: response.intent,
-          agents: response.agents,
-          confidence: response.metadata?.confidence,
-          reasoning: response.metadata?.reasoning,
-          agentOutputs: response.agentOutputs,
+    // Call backend AI execute API
+    yield* streamAI(
+      {
+        task: 'generate',
+        input: lastMessage.content,
+        context,
+        metadata: {
+          ...options.metadata,
+          messageHistory: contextMessages.length,
         },
-      }));
-    }
+      },
+      options.selectedModelId
+    );
+
+    console.log('✅ Backend AI Response completed');
 
   } catch (error: any) {
-    console.error('Orchestration API error:', error);
+    console.error('Backend AI API error:', error);
     throw new Error(
-      `Orchestration failed: ${error?.message || 'Unknown error'}. Try using Gemini provider as fallback.`
+      `Backend AI failed: ${error?.message || 'Unknown error'}. Try using Gemini provider as fallback.`
     );
   }
 }
@@ -136,10 +104,10 @@ async function* streamMessageViaGemini(
 }
 
 /**
- * Stream a message - uses orchestration by default, falls back to Gemini if needed
+ * Stream a message - uses backend API by default, falls back to Gemini if needed
  * 
  * @param messages Chat message history
- * @param options Streaming options including provider selection
+ * @param options Streaming options including provider selection and model ID
  * @returns Async generator yielding response chunks
  */
 export async function* streamAIMessage(
@@ -149,22 +117,22 @@ export async function* streamAIMessage(
   const provider = options.provider || getDefaultProvider();
 
   try {
-    if (provider === 'orchestration') {
-      // Try orchestration first
-      yield* streamMessageViaOrchestration(messages, options);
+    if (provider === 'backend') {
+      // Try backend AI API first
+      yield* streamMessageViaBackend(messages, options);
     } else {
       // Use Gemini
       yield* streamMessageViaGemini(messages);
     }
   } catch (error: any) {
-    // If orchestration fails and we're using it, try Gemini as fallback
-    if (provider === 'orchestration') {
-      console.warn('Orchestration failed, falling back to Gemini:', error);
+    // If backend fails and we're using it, try Gemini as fallback
+    if (provider === 'backend') {
+      console.warn('Backend AI failed, falling back to Gemini:', error);
       try {
         yield* streamMessageViaGemini(messages);
       } catch (geminiError: any) {
         throw new Error(
-          `Both orchestration and Gemini failed. Orchestration: ${error?.message || 'Unknown'}, Gemini: ${geminiError?.message || 'Unknown'}`
+          `Both backend AI and Gemini failed. Backend: ${error?.message || 'Unknown'}, Gemini: ${geminiError?.message || 'Unknown'}`
         );
       }
     } else {
@@ -186,4 +154,9 @@ export async function sendAIMessage(
   }
   return fullResponse;
 }
+
+/**
+ * Export backend model type for use in components
+ */
+export type { BackendModel } from './backend-ai.service';
 

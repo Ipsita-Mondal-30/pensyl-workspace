@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import type { Editor } from "@tiptap/core";
-import type { CommentData } from "../extensions/research-paper/CommentMark";
+import type { CommentData } from "../../extensions/research-paper/CommentMark";
 import { CommentThread } from "./CommentThread";
 
 interface ReviewPanelProps {

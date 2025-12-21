@@ -1,8 +1,8 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import type { Editor } from "@tiptap/core";
-import type { SectionContext } from "../utils/sectionDetector";
-import type { SectionType } from "../types/research-paper";
+import type { SectionContext } from "../../utils/sectionDetector";
+import type { SectionType } from "../../types/research-paper";
 
 interface ContextualToolbarProps {
   editor: Editor | null;

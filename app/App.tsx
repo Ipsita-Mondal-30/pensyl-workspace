@@ -16,16 +16,19 @@ import {
   CitationHeatmap,
   AutoToC,
   MissingCitationIndicator,
+  FigureEditor,
+  MathEditor,
+  CitationDialog,
+  TableInsertDialog,
   type CursorPosition,
   type Command,
+  type ViewMode,
+  type TabData,
 } from "./components";
-import { FigureEditor } from "./components/FigureEditor";
-import { MathEditor } from "./components/MathEditor";
-import { CitationDialog } from "./components/CitationDialog";
-import { TableInsertDialog } from "./components/TableInsertDialog";
-import type { ViewMode } from "./components/ViewModeToggle";
+import { LoginPage } from "./components/auth/LoginPage";
+import { OnboardingPage } from "./components/onboarding/OnboardingPage";
+import { useAuth } from "./hooks/useAuth";
 import type { FileItem } from "./shared/types";
-import type { TabData } from "./components/Tab";
 import TurndownService from "turndown";
 import { marked } from "marked";
 import { localStorageFS } from "./lib/localStorageFS";
@@ -39,8 +42,34 @@ import { exportToMarkdown } from "./lib/export/markdownExporter";
 import { exportToLaTeX } from "./lib/export/latexExporter";
 import { exportToDOCX } from "./lib/export/docxExporter";
 import { calculateDocumentAnalytics } from "./utils/documentAnalytics";
+import { researchPaperTemplate1 } from "./lib/templates/research-paper-template-1";
 
 function App() {
+  // Auth state
+  const { user, loading: authLoading, refreshSession } = useAuth();
+  const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState<boolean | null>(null);
+
+  // Check onboarding status on mount
+  useEffect(() => {
+    if (user && hasCompletedOnboarding === null) {
+      const onboardingStatus = localStorage.getItem(`onboarding_completed_${user.id}`);
+      setHasCompletedOnboarding(onboardingStatus === 'true');
+    }
+  }, [user, hasCompletedOnboarding]);
+
+  // Refresh session on mount and handle OAuth callback
+  useEffect(() => {
+    refreshSession();
+    
+    // Check if we're coming back from OAuth callback
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.has('code') || urlParams.has('state')) {
+      // OAuth callback - refresh session after a short delay
+      setTimeout(() => {
+        refreshSession();
+      }, 1000);
+    }
+  }, [refreshSession]);
   const [currentFolder, setCurrentFolder] = useState<string | undefined>();
   const [files, setFiles] = useState<FileItem[]>([]);
   const [selectedFileId, setSelectedFileId] = useState<string | undefined>();
@@ -1103,8 +1132,29 @@ function App() {
           // TODO: Implement source addition
         }}
         onCite={() => {
-          console.log("Cite");
-          // TODO: Implement citation
+          // Get selected text from editor for citation search
+          let searchQuery = "";
+          if (editorRef.current) {
+            const { from, to } = editorRef.current.state.selection;
+            const selectedText = editorRef.current.state.doc.textBetween(from, to);
+            if (selectedText.trim()) {
+              searchQuery = selectedText.trim();
+            }
+          }
+          
+          // If no selection, get text around cursor (last sentence or paragraph)
+          if (!searchQuery && editorRef.current) {
+            const { $from } = editorRef.current.state.selection;
+            const currentParagraph = $from.node($from.depth);
+            if (currentParagraph && currentParagraph.textContent) {
+              // Get last 100 characters as context
+              const text = currentParagraph.textContent;
+              searchQuery = text.slice(Math.max(0, text.length - 100));
+            }
+          }
+          
+          setShowCitationDialog(true);
+          // Pass search query will be handled by CitationDialog's initialSearchQuery prop
         }}
       />
       <div className="flex overflow-hidden flex-1">
@@ -1302,6 +1352,14 @@ function App() {
         isOpen={showCitationDialog}
         onClose={() => setShowCitationDialog(false)}
         onInsert={handleInsertCitation}
+        initialSearchQuery={
+          editorRef.current?.state.selection
+            ? editorRef.current.state.doc.textBetween(
+                editorRef.current.state.selection.from,
+                editorRef.current.state.selection.to
+              ).trim() || undefined
+            : undefined
+        }
       />
       <TableInsertDialog
         isOpen={showTableDialog}

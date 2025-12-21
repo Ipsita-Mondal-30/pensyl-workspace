@@ -1,7 +1,7 @@
 "use client";
 import { useState, useRef } from "react";
 import type { Editor } from "@tiptap/core";
-import type { FigureNodeAttributes } from "../extensions/research-paper/FigureNode";
+import type { FigureNodeAttributes } from "../../extensions/research-paper/FigureNode";
 
 interface FigureEditorProps {
   editor: Editor | null;

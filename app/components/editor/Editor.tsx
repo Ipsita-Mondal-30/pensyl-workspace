@@ -23,22 +23,22 @@ import { Dropcursor } from "@tiptap/extension-dropcursor";
 import { Gapcursor } from "@tiptap/extension-gapcursor";
 import { createLowlight } from "lowlight";
 // Research paper extensions
-import { PaperNode } from "../extensions/research-paper/PaperNode";
-import { FrontMatterNode } from "../extensions/research-paper/FrontMatterNode";
-import { AbstractNode } from "../extensions/research-paper/AbstractNode";
-import { SectionNode } from "../extensions/research-paper/SectionNode";
-import { FigureNode } from "../extensions/research-paper/FigureNode";
-import { CaptionNode } from "../extensions/research-paper/CaptionNode";
-import { TableCaption } from "../extensions/research-paper/TableCaption";
-import { InlineMathNode } from "../extensions/research-paper/InlineMathNode";
-import { BlockEquationNode } from "../extensions/research-paper/BlockEquationNode";
-import { CitationMark } from "../extensions/research-paper/CitationMark";
-import { ReferenceNode } from "../extensions/research-paper/ReferenceNode";
-import { TrackChanges } from "../extensions/research-paper/TrackChanges";
-import { CommentMark } from "../extensions/research-paper/CommentMark";
-import { FontSize } from "../extensions/FontSize";
+import { PaperNode } from "../../extensions/research-paper/PaperNode";
+import { FrontMatterNode } from "../../extensions/research-paper/FrontMatterNode";
+import { AbstractNode } from "../../extensions/research-paper/AbstractNode";
+import { SectionNode } from "../../extensions/research-paper/SectionNode";
+import { FigureNode } from "../../extensions/research-paper/FigureNode";
+import { CaptionNode } from "../../extensions/research-paper/CaptionNode";
+import { TableCaption } from "../../extensions/research-paper/TableCaption";
+import { InlineMathNode } from "../../extensions/research-paper/InlineMathNode";
+import { BlockEquationNode } from "../../extensions/research-paper/BlockEquationNode";
+import { CitationMark } from "../../extensions/research-paper/CitationMark";
+import { ReferenceNode } from "../../extensions/research-paper/ReferenceNode";
+import { TrackChanges } from "../../extensions/research-paper/TrackChanges";
+import { CommentMark } from "../../extensions/research-paper/CommentMark";
+import { FontSize } from "../../extensions/FontSize";
 // Contextual toolbar
-import { useSectionContext } from "../hooks/useSectionContext";
+import { useSectionContext } from "../../hooks/useSectionContext";
 import { ContextualToolbar } from "./ContextualToolbar";
 import {
   useEffect,

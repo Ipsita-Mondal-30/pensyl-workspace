@@ -1,15 +1,17 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import type { Editor } from "@tiptap/core";
-import type { CitationData } from "../types/research-paper";
-import { citationManager } from "../lib/citationManager";
-import { formatInTextCitation } from "../utils/citationFormatter";
+import type { CitationData } from "../../types/research-paper";
+import { citationManager } from "../../lib/citationManager";
+import { formatInTextCitation } from "../../utils/citationFormatter";
+import { searchCitations, type Citation } from "../../services/citation.service";
 
 interface CitationDialogProps {
   editor: Editor | null;
   isOpen: boolean;
   onClose: () => void;
   onInsert: (citationId: string, style: "apa" | "ieee" | "mla" | "acm") => void;
+  initialSearchQuery?: string; // Optional initial search query from editor selection
 }
 
 export function CitationDialog({
@@ -17,8 +19,9 @@ export function CitationDialog({
   isOpen,
   onClose,
   onInsert,
+  initialSearchQuery = "",
 }: CitationDialogProps) {
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState(initialSearchQuery);
   const [selectedStyle, setSelectedStyle] = useState<"apa" | "ieee" | "mla" | "acm">("apa");
   const [newCitation, setNewCitation] = useState<Partial<CitationData>>({
     authors: [],
@@ -26,19 +29,117 @@ export function CitationDialog({
     year: new Date().getFullYear(),
   });
   const [showNewForm, setShowNewForm] = useState(false);
+  const [searchResults, setSearchResults] = useState<Citation[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+
+  const handleSearchOpenAlex = useCallback(async (query: string, style?: "apa" | "ieee" | "mla" | "acm") => {
+    if (!query.trim()) {
+      setSearchResults([]);
+      return;
+    }
+
+    setIsSearching(true);
+    setSearchError(null);
+
+    try {
+      const citationStyle = style || selectedStyle;
+      const styleForBackend = citationStyle === "ieee" ? "ieee" : citationStyle === "mla" ? "mla" : "apa";
+      
+      const result = await searchCitations({
+        prompt: query,
+        citationStyle: styleForBackend as "apa" | "mla" | "chicago" | "ieee",
+      });
+
+      // Convert backend citations to local format and add to manager
+      const convertedCitations: Citation[] = result.citations || [];
+      setSearchResults(convertedCitations);
+
+      // Add found citations to citation manager with current style
+      convertedCitations.forEach((citation) => {
+        const citationId = citation.id || `cite-${citation.openalexId.split('/').pop() || Date.now()}`;
+        const citationData: CitationData = {
+          id: citationId,
+          style: citationStyle,
+          authors: citation.authors || [],
+          title: citation.title || "",
+          year: citation.year || new Date().getFullYear(),
+          journal: citation.venue,
+          doi: citation.doi,
+        };
+        citationManager.addCitation(citationData.id, citationData);
+      });
+    } catch (error: any) {
+      console.error("Citation search error:", error);
+      setSearchError(error?.message || "Failed to search citations");
+      setSearchResults([]);
+    } finally {
+      setIsSearching(false);
+    }
+  }, [selectedStyle]);
+
+  // Initialize search query if provided
+  useEffect(() => {
+    if (initialSearchQuery && isOpen) {
+      setSearchQuery(initialSearchQuery);
+      handleSearchOpenAlex(initialSearchQuery);
+    }
+  }, [initialSearchQuery, isOpen, handleSearchOpenAlex]);
+
+  // Debounced search for OpenAlex
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const timeoutId = setTimeout(() => {
+      if (searchQuery.trim().length > 2) {
+        handleSearchOpenAlex(searchQuery);
+      } else {
+        setSearchResults([]);
+        setSearchError(null);
+      }
+    }, 500); // 500ms debounce
+
+    return () => clearTimeout(timeoutId);
+  }, [searchQuery, isOpen, handleSearchOpenAlex]);
+
+  // Reset state when dialog closes
+  useEffect(() => {
+    if (!isOpen) {
+      setSearchQuery("");
+      setSearchResults([]);
+      setSearchError(null);
+      setIsSearching(false);
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
   const allCitations = citationManager.getAllCitations();
-  const filteredCitations = allCitations.filter((citation) => {
-    if (!searchQuery) return true;
-    const query = searchQuery.toLowerCase();
-    return (
-      citation.id.toLowerCase().includes(query) ||
-      citation.title.toLowerCase().includes(query) ||
-      citation.authors.some((a: string) => a.toLowerCase().includes(query))
-    );
-  });
+  
+  // Combine existing citations with search results (prioritize search results)
+  const displayCitations = searchResults.length > 0
+    ? searchResults.map((citation) => {
+        const citationId = citation.id || `cite-${citation.openalexId.split('/').pop() || Date.now()}`;
+        const existing = citationManager.getCitation(citationId);
+        return existing || {
+          id: citationId,
+          style: selectedStyle,
+          authors: citation.authors || [],
+          title: citation.title || "",
+          year: citation.year || new Date().getFullYear(),
+          journal: citation.venue,
+          doi: citation.doi,
+        } as CitationData;
+      })
+    : allCitations.filter((citation) => {
+        if (!searchQuery) return true;
+        const query = searchQuery.toLowerCase();
+        return (
+          citation.id.toLowerCase().includes(query) ||
+          citation.title.toLowerCase().includes(query) ||
+          citation.authors.some((a: string) => a.toLowerCase().includes(query))
+        );
+      });
 
   const handleInsert = (citationId: string) => {
     onInsert(citationId, selectedStyle);
@@ -91,7 +192,14 @@ export function CitationDialog({
           </label>
           <select
             value={selectedStyle}
-            onChange={(e) => setSelectedStyle(e.target.value as any)}
+            onChange={(e) => {
+              const newStyle = e.target.value as "apa" | "ieee" | "mla" | "acm";
+              setSelectedStyle(newStyle);
+              // Re-search if we have a search query
+              if (searchQuery.trim().length > 2) {
+                handleSearchOpenAlex(searchQuery, newStyle);
+              }
+            }}
             className="w-full px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
           >
             <option value="apa">APA</option>
@@ -103,13 +211,28 @@ export function CitationDialog({
 
         {/* Search */}
         <div className="mb-4">
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search citations..."
-            className="w-full px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded text-sm text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
-          />
+          <div className="relative">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search citations (OpenAlex)..."
+              className="w-full px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded text-sm text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
+            />
+            {isSearching && (
+              <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                <div className="w-4 h-4 border-2 border-[var(--accent-primary)] border-t-transparent rounded-full animate-spin"></div>
+              </div>
+            )}
+          </div>
+          {searchError && (
+            <p className="text-xs text-red-500 mt-1">{searchError}</p>
+          )}
+          {searchResults.length > 0 && (
+            <p className="text-xs text-[var(--text-tertiary)] mt-1">
+              Found {searchResults.length} citation(s) from OpenAlex
+            </p>
+          )}
         </div>
 
         {/* Toggle New Form */}
@@ -215,16 +338,18 @@ export function CitationDialog({
 
         {/* Citation List */}
         <div className="flex-1 overflow-y-auto mb-4">
-          {filteredCitations.length === 0 ? (
+          {displayCitations.length === 0 && !isSearching ? (
             <p className="text-sm text-[var(--text-secondary)] text-center py-8">
-              No citations found. Add a new citation to get started.
+              {searchQuery.trim().length > 0
+                ? "No citations found. Try a different search term or add a new citation."
+                : "No citations found. Search for citations or add a new citation to get started."}
             </p>
           ) : (
             <div className="space-y-2">
-              {filteredCitations.map((citation) => (
+              {displayCitations.map((citation) => (
                 <div
                   key={citation.id}
-                  className="p-3 bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded hover:bg-[var(--bg-hover)] cursor-pointer"
+                  className="p-3 bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded hover:bg-[var(--bg-hover)] cursor-pointer transition-colors"
                   onClick={() => handleInsert(citation.id)}
                 >
                   <div className="flex items-start justify-between">
@@ -238,6 +363,11 @@ export function CitationDialog({
                       <div className="text-xs text-[var(--text-tertiary)] mt-1">
                         {citation.title}
                       </div>
+                      {citation.doi && (
+                        <div className="text-xs text-[var(--text-tertiary)] mt-1">
+                          DOI: {citation.doi}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

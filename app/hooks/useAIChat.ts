@@ -17,6 +17,7 @@ export interface AIMessageOptions {
     currentFileName?: string;
     cursorInfo?: { line: number; column: number };
     workspacePath?: string;
+    selectedModelId?: string; // Model ID from backend model registry
 }
 
 /**
@@ -98,7 +99,7 @@ export function useAIChat() {
                 },
             ];
 
-            // Stream response using unified AI service (orchestration by default)
+            // Stream response using unified AI service (backend by default)
             for await (const chunk of streamAIMessage(messages, {
                 context: options.currentFileName 
                     ? `Context: Editing ${options.currentFileName}${options.cursorInfo ? ` at line ${options.cursorInfo.line}` : ''}`
@@ -108,6 +109,7 @@ export function useAIChat() {
                     currentFilePath: options.currentFilePath,
                     workspacePath: options.workspacePath,
                 },
+                selectedModelId: options.selectedModelId, // Pass selected model ID if provided
             })) {
                 yield chunk;
             }

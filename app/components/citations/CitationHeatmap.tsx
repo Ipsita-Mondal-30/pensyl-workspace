@@ -1,5 +1,5 @@
 "use client";
-import type { DocumentAnalytics } from "../utils/documentAnalytics";
+import type { DocumentAnalytics } from "../../utils/documentAnalytics";
 
 interface CitationHeatmapProps {
   analytics: DocumentAnalytics;

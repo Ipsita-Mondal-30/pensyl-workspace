@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
-import { FileIcon } from "./Icons";
+import { FileIcon } from "../ui/Icons";
 
 interface FileType {
   name: string;

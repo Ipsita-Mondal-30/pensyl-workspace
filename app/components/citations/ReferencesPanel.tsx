@@ -1,9 +1,9 @@
 "use client";
 import { useState, useEffect } from "react";
 import type { Editor } from "@tiptap/core";
-import { citationManager } from "../lib/citationManager";
-import { formatBibliography } from "../utils/citationFormatter";
-import type { ReferenceData } from "../types/research-paper";
+import { citationManager } from "../../lib/citationManager";
+import { formatBibliography } from "../../utils/citationFormatter";
+import type { ReferenceData } from "../../types/research-paper";
 
 interface ReferencesPanelProps {
   editor: Editor | null;

@@ -1,17 +1,13 @@
 
 "use client";
 import { useState, useRef, useEffect } from "react";
-import { ChevronRightIcon } from "./Icons";
-import {
-  streamMessageToGemini,
-  getAvailableModelsForUI,
-  type AvailableModel,
-} from "../services/gemini";
+import { ChevronRightIcon } from "../ui/Icons";
+import { getAvailableModels, type BackendModel } from "../../services/backend-ai.service";
 import ReactMarkdown from "react-markdown";
-import { useAIChat } from "../hooks/useAIChat";
+import { useAIChat } from "../../hooks/useAIChat";
 import type { Editor } from "@tiptap/react";
 import { PatchPreview } from "./PatchPreview";
-import { parseAIResponse, applyPatch, applyPatches, type Patch } from "../utils/patchParser";
+import { parseAIResponse, applyPatch, applyPatches, type Patch } from "../../utils/patchParser";
 
 
 interface Message {
@@ -62,9 +58,8 @@ export function ChatPanel({
   const [inputValue, setInputValue] = useState("");
   const [isExpanded, setIsExpanded] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedModel, setSelectedModel] =
-    useState<string>("gemini-2.5-flash");
-  const [availableModels, setAvailableModels] = useState<AvailableModel[]>([]);
+  const [selectedModel, setSelectedModel] = useState<string>("");
+  const [availableModels, setAvailableModels] = useState<BackendModel[]>([]);
   const [showModelSelector, setShowModelSelector] = useState(false);
   const [modelSearchQuery, setModelSearchQuery] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -102,19 +97,29 @@ export function ChatPanel({
     setContextFiles([...new Set(files)]); // Remove duplicates
   }, [currentFileName, inputValue, extractFileReferences]);
 
-  // Load available models on mount
+  // Load available models from backend on mount
   useEffect(() => {
-    getAvailableModelsForUI().then((models) => {
-      if (models.length > 0) {
-        setAvailableModels(models);
-        // Set default to first flash model or first model
-        const defaultModel =
-          models.find((m) => m.category === "flash") || models[0];
-        if (defaultModel) {
-          setSelectedModel(defaultModel.id);
+    getAvailableModels()
+      .then((models) => {
+        if (models.length > 0) {
+          setAvailableModels(models);
+          // Set default to first cheap model (costTier === 1) or first model
+          const defaultModel =
+            models.find((m) => m.costTier === 1) || models[0];
+          if (defaultModel) {
+            setSelectedModel(defaultModel.id);
+          }
+        } else {
+          // No models available from backend, use a fallback default
+          console.warn('No models available from backend, using fallback');
+          setSelectedModel("openrouter/deepseek-chat");
         }
-      }
-    });
+      })
+      .catch((error) => {
+        console.error('Failed to load models from backend:', error);
+        // Set a default model ID if backend fails
+        setSelectedModel("openrouter/deepseek-chat");
+      });
   }, []);
 
   // Auto-scroll to bottom when new messages arrive
@@ -320,6 +325,7 @@ export function ChatPanel({
           currentFileName,
           workspacePath,
           cursorInfo: cursorPosition,
+          selectedModelId: selectedModel, // Pass selected model ID
         }
       )) {
         if (abortControllerRef.current?.signal.aborted) {

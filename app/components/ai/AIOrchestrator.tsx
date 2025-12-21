@@ -8,7 +8,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useAIOrchestration } from '../hooks/useAIOrchestration';
+import { useAIOrchestration } from '../../hooks/useAIOrchestration';
 
 export interface AIOrchestratorProps {
   onResult?: (result: string) => void;

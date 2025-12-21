@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import type { Editor } from "@tiptap/core";
-import { renderMath, isValidLatex } from "../utils/mathRenderer";
+import { renderMath, isValidLatex } from "../../utils/mathRenderer";
 
 interface MathEditorProps {
   editor: Editor | null;

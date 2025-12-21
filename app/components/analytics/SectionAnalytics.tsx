@@ -1,5 +1,5 @@
 "use client";
-import type { DocumentAnalytics, SectionAnalytics as SectionAnalyticsType } from "../utils/documentAnalytics";
+import type { DocumentAnalytics, SectionAnalytics as SectionAnalyticsType } from "../../utils/documentAnalytics";
 
 interface SectionAnalyticsProps {
   analytics: DocumentAnalytics;

@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import type { CommentData } from "../extensions/research-paper/CommentMark";
+import type { CommentData } from "../../extensions/research-paper/CommentMark";
 
 interface CommentThreadProps {
   comment: CommentData;
