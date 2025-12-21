@@ -4,22 +4,15 @@
  * A well-structured research paper template with all standard sections
  */
 
-export const researchPaperTemplate1 = `---
-title: "Your Research Paper Title"
-authors: 
-  - name: "Author Name"
-    affiliation: "Institution Name"
-abstract: |
-  Write a concise abstract of your research here. This should summarize the key points of your paper, including the research question, methodology, main findings, and conclusions. Keep it between 150-250 words.
-keywords:
-  - keyword1
-  - keyword2
-  - keyword3
----
+export const researchPaperTemplate1 = `# Your Research Paper Title
 
-# Abstract
+**Authors:** Author Name, Institution Name
+
+## Abstract
 
 Write a concise abstract of your research here. This should summarize the key points of your paper, including the research question, methodology, main findings, and conclusions. Keep it between 150-250 words.
+
+**Keywords:** keyword1, keyword2, keyword3
 
 # 1. Introduction
 
@@ -127,17 +120,15 @@ Suggest directions for future research based on your findings and limitations.
 
 # References
 
-[Your references will appear here. Use the citation feature to add citations throughout your paper.]
+Your references will appear here. Use the citation feature to add citations throughout your paper.
 
 ---
 
-## Notes for Authors
+## Notes
 
 - Replace all placeholder text with your actual content
 - Use the citation feature to add references
 - Insert figures and tables as needed using the insert menu
 - Use the AI assistant to help refine your writing
-- Review the paper in different view modes (Writing, Paper, LaTeX)
-
-**Good luck with your research!** 🎓`;
+- Review the paper in different view modes (Writing, Paper, LaTeX)`;
 

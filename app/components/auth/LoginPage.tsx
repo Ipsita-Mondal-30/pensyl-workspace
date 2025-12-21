@@ -56,18 +56,18 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-[#F7F8F4] p-4">
       <div className="w-full max-w-md">
-        <div className="bg-white/10 backdrop-blur-lg rounded-2xl shadow-2xl border border-white/20 p-8">
+        <div className="bg-white rounded-2xl shadow-2xl border border-[#A8B8A0] p-8">
           {/* Logo/Title */}
           <div className="text-center mb-8">
-            <h1 className="text-4xl font-bold text-white mb-2">Intellirite</h1>
-            <p className="text-white/70">Your AI-Powered Writing Assistant</p>
+            <h1 className="text-4xl font-bold text-[#234E40] mb-2">Pensyl</h1>
+            <p className="text-[#5F7E64]">Your AI-Powered Writing Assistant</p>
           </div>
 
           {/* Error Message */}
           {error && (
-            <div className="mb-4 p-3 bg-red-500/20 border border-red-500/50 rounded-lg text-red-200 text-sm">
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
               {error}
             </div>
           )}
@@ -76,14 +76,14 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
           <form onSubmit={handleSubmit} className="space-y-4">
             {isSignUp && (
               <div>
-                <label className="block text-sm font-medium text-white/90 mb-2">
+                <label className="block text-sm font-medium text-[#234E40] mb-2">
                   Name
                 </label>
                 <input
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  className="w-full px-4 py-3 bg-[#F7F8F4] border border-[#A8B8A0] rounded-lg text-[#1A1A1C] placeholder-[#5F7E64] focus:outline-none focus:ring-2 focus:ring-[#234E40] focus:border-transparent"
                   placeholder="Your name"
                   required={isSignUp}
                 />
@@ -91,28 +91,28 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
             )}
 
             <div>
-              <label className="block text-sm font-medium text-white/90 mb-2">
+              <label className="block text-sm font-medium text-[#234E40] mb-2">
                 Email
               </label>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                className="w-full px-4 py-3 bg-[#F7F8F4] border border-[#A8B8A0] rounded-lg text-[#1A1A1C] placeholder-[#5F7E64] focus:outline-none focus:ring-2 focus:ring-[#234E40] focus:border-transparent"
                 placeholder="you@example.com"
                 required
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-white/90 mb-2">
+              <label className="block text-sm font-medium text-[#234E40] mb-2">
                 Password
               </label>
               <input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                className="w-full px-4 py-3 bg-[#F7F8F4] border border-[#A8B8A0] rounded-lg text-[#1A1A1C] placeholder-[#5F7E64] focus:outline-none focus:ring-2 focus:ring-[#234E40] focus:border-transparent"
                 placeholder="••••••••"
                 required
                 minLength={8}
@@ -122,7 +122,7 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold rounded-lg hover:from-purple-700 hover:to-pink-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 focus:ring-offset-transparent disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+              className="w-full py-3 bg-[#234E40] text-white font-semibold rounded-lg hover:bg-[#1B3A34] focus:outline-none focus:ring-2 focus:ring-[#234E40] focus:ring-offset-2 focus:ring-offset-white disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
             >
               {loading ? 'Please wait...' : isSignUp ? 'Sign Up' : 'Sign In'}
             </button>
@@ -131,10 +131,10 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
           {/* Divider */}
           <div className="relative my-6">
             <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-white/20"></div>
+              <div className="w-full border-t border-[#A8B8A0]"></div>
             </div>
             <div className="relative flex justify-center text-sm">
-              <span className="px-2 bg-transparent text-white/70">Or continue with</span>
+              <span className="px-2 bg-white text-[#5F7E64]">Or continue with</span>
             </div>
           </div>
 
@@ -142,7 +142,7 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
           <button
             onClick={handleGoogleSignIn}
             disabled={loading}
-            className="w-full py-3 bg-white/10 border border-white/20 text-white font-semibold rounded-lg hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 focus:ring-offset-transparent disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center gap-3"
+            className="w-full py-3 bg-[#F7F8F4] border border-[#A8B8A0] text-[#234E40] font-semibold rounded-lg hover:bg-[#D5E3D0] focus:outline-none focus:ring-2 focus:ring-[#234E40] focus:ring-offset-2 focus:ring-offset-white disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center gap-3"
           >
             <svg className="w-5 h-5" viewBox="0 0 24 24">
               <path
@@ -172,15 +172,15 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
                 setIsSignUp(!isSignUp);
                 setError('');
               }}
-              className="text-white/70 hover:text-white text-sm transition-colors"
+              className="text-[#5F7E64] hover:text-[#234E40] text-sm transition-colors"
             >
               {isSignUp ? (
                 <>
-                  Already have an account? <span className="text-purple-400 font-semibold">Sign In</span>
+                  Already have an account? <span className="text-[#234E40] font-semibold">Sign In</span>
                 </>
               ) : (
                 <>
-                  Don't have an account? <span className="text-purple-400 font-semibold">Sign Up</span>
+                  Don't have an account? <span className="text-[#234E40] font-semibold">Sign Up</span>
                 </>
               )}
             </button>

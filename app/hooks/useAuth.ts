@@ -20,6 +20,7 @@ export function useAuth(): UseAuthReturn {
   const [loading, setLoading] = useState(true);
 
   const refreshSession = useCallback(async () => {
+    setLoading(true);
     try {
       const currentSession = await authClient.getSession();
       setSession(currentSession);
@@ -34,26 +35,34 @@ export function useAuth(): UseAuthReturn {
   }, []);
 
   useEffect(() => {
+    // Only refresh session once on mount
     refreshSession();
-  }, [refreshSession]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Empty deps - only run once on mount
 
   const signInEmail = useCallback(async (email: string, password: string) => {
     const result = await authClient.signInEmail(email, password);
     if (result.session) {
       setSession(result.session);
       setUser(result.session.user);
+    } else if (!result.error) {
+      // If no error but no session, refresh from server
+      await refreshSession();
     }
     return { error: result.error };
-  }, []);
+  }, [refreshSession]);
 
   const signUpEmail = useCallback(async (email: string, password: string, name?: string) => {
     const result = await authClient.signUpEmail(email, password, name);
     if (result.session) {
       setSession(result.session);
       setUser(result.session.user);
+    } else if (!result.error) {
+      // If no error but no session, refresh from server
+      await refreshSession();
     }
     return { error: result.error };
-  }, []);
+  }, [refreshSession]);
 
   const signInWithGoogle = useCallback(async () => {
     await authClient.signInWithGoogle();

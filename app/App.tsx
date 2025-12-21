@@ -49,18 +49,17 @@ function App() {
   const { user, loading: authLoading, refreshSession } = useAuth();
   const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState<boolean | null>(null);
 
-  // Check onboarding status on mount
+  // Check onboarding status when user is available
   useEffect(() => {
     if (user && hasCompletedOnboarding === null) {
+      // User is logged in - check onboarding status
       const onboardingStatus = localStorage.getItem(`onboarding_completed_${user.id}`);
       setHasCompletedOnboarding(onboardingStatus === 'true');
     }
   }, [user, hasCompletedOnboarding]);
 
-  // Refresh session on mount and handle OAuth callback
+  // Handle OAuth callback
   useEffect(() => {
-    refreshSession();
-    
     // Check if we're coming back from OAuth callback
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.has('code') || urlParams.has('state')) {
@@ -69,7 +68,8 @@ function App() {
         refreshSession();
       }, 1000);
     }
-  }, [refreshSession]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only check on mount
   const [currentFolder, setCurrentFolder] = useState<string | undefined>();
   const [files, setFiles] = useState<FileItem[]>([]);
   const [selectedFileId, setSelectedFileId] = useState<string | undefined>();
@@ -1115,6 +1115,65 @@ function App() {
     };
   }, []);
 
+  // Show loading state only while checking auth
+  if (authLoading) {
+    return (
+      <div className="w-full h-screen flex items-center justify-center bg-[#F7F8F4]">
+        <div className="text-[#234E40] text-lg">Loading...</div>
+      </div>
+    );
+  }
+
+  // Show login page if not authenticated
+  if (!user) {
+    return <LoginPage onLoginSuccess={() => refreshSession()} />;
+  }
+
+  // Show onboarding if user hasn't completed it
+  // If hasCompletedOnboarding is null, we're still checking, so show onboarding as default
+  if (hasCompletedOnboarding !== true) {
+    const handleOnboardingComplete = (projectType: 'research-paper' | 'other', template?: string) => {
+      // Mark onboarding as completed
+      localStorage.setItem(`onboarding_completed_${user.id}`, 'true');
+      setHasCompletedOnboarding(true);
+
+      // If research paper template selected, load it
+      if (projectType === 'research-paper' && template === 'template-1') {
+        // Load template into the editor
+        setTimeout(() => {
+          const templateContent = researchPaperTemplate1;
+          // Create the research paper file with template content
+          localStorageFS.writeFile(MAIN_FILE_PATH, templateContent).then(() => {
+            // Create a new tab with the template
+            const newTab: TabData = {
+              id: `tab-${Date.now()}`,
+              filePath: MAIN_FILE_PATH,
+              fileName: "research-paper.md",
+              isModified: false,
+              content: templateContent,
+            };
+            setTabs([newTab]);
+            setActiveTabId(newTab.id);
+          }).catch((error) => {
+            console.error('Failed to write template file:', error);
+            // Still create the tab even if write fails
+            const newTab: TabData = {
+              id: `tab-${Date.now()}`,
+              filePath: MAIN_FILE_PATH,
+              fileName: "research-paper.md",
+              isModified: false,
+              content: templateContent,
+            };
+            setTabs([newTab]);
+            setActiveTabId(newTab.id);
+          });
+        }, 100);
+      }
+    };
+
+    return <OnboardingPage onComplete={handleOnboardingComplete} />;
+  }
+
   return (
     <div className="w-full h-screen flex flex-col bg-[var(--bg-primary)] text-[var(--text-primary)] overflow-hidden">
       <TopBar
@@ -1297,8 +1356,8 @@ function App() {
         onClose={() => setIsReviewPanelOpen(false)}
       />
 
-      {/* Missing Citation Indicator */}
-      <MissingCitationIndicator editor={editorRef.current} />
+      {/* Missing Citation Indicator - Disabled to avoid interfering with chatbox */}
+      {/* <MissingCitationIndicator editor={editorRef.current} /> */}
 
       {/* Analytics Panel (can be toggled via command palette or button) */}
       {showAnalytics && analytics && (

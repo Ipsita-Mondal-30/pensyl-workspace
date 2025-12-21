@@ -50,3 +50,9 @@ export { ViewModeToggle, type ViewMode } from './ui/ViewModeToggle';
 
 // Re-export Patch type from utils
 export type { Patch } from '../utils/patchParser';
+
+// Auth components
+export { LoginPage } from './auth/LoginPage';
+
+// Onboarding components
+export { OnboardingPage } from './onboarding/OnboardingPage';

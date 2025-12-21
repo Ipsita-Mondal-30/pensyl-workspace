@@ -56,9 +56,9 @@ export interface AIExecuteResponse {
  */
 function getBackendUrl(): string {
   if (typeof window === 'undefined') {
-    return process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001';
+    return process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3000';
   }
-  return process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001';
+  return process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3000';
 }
 
 /**
