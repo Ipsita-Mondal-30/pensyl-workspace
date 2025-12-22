@@ -48,9 +48,9 @@ function initializeDefaultStructure(): void {
   const data = getFSData();
   if (Object.keys(data).length === 0) {
     // Create root folder with a welcome file
-    const welcomeContent = `# Welcome to Intellirite
+    const welcomeContent = `# Welcome to Pensyl
 
-This is a web-based version of Intellirite. All your files are stored in browser localStorage.
+This is a web-based version of Pensyl. All your files are stored in browser localStorage.
 
 ## Getting Started
 

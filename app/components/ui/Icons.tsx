@@ -1,6 +1,6 @@
 "use client";
 /**
- * Icon Components for Intellirite
+ * Icon Components for Pensyl
  */
 
 interface IconProps {

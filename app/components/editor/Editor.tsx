@@ -239,6 +239,89 @@ export const Editor = forwardRef<any, EditorProps>(function Editor(
       attributes: {
         class: "prose prose-invert max-w-none focus:outline-none px-4 py-3",
       },
+      handlePaste: (view, event) => {
+        // Handle image paste from clipboard
+        const items = Array.from(event.clipboardData?.items || []);
+        const imageItem = items.find(
+          (item) => item.type.indexOf("image") !== -1
+        );
+
+        if (imageItem) {
+          event.preventDefault();
+          const file = imageItem.getAsFile();
+          if (file) {
+            const reader = new FileReader();
+            reader.onload = (readerEvent) => {
+              const base64 = readerEvent.target?.result as string;
+              if (base64) {
+                // Insert image using ProseMirror API
+                const { state, dispatch } = view;
+                const { selection } = state;
+                const { from } = selection;
+
+                // Create image node
+                const imageNode = state.schema.nodes.image.create({
+                  src: base64,
+                });
+
+                // Insert image at cursor position
+                const tr = state.tr.insert(from, imageNode);
+                dispatch(tr);
+              }
+            };
+            reader.onerror = () => {
+              console.error("Failed to read image file");
+            };
+            reader.readAsDataURL(file);
+            return true; // Handled
+          }
+        }
+        return false; // Let TipTap handle other paste events
+      },
+      handleDrop: (view, event, slice, moved) => {
+        // Handle image drop
+        if (moved) return false; // Let TipTap handle moved content
+
+        const files = Array.from(event.dataTransfer?.files || []);
+        const imageFile = files.find(
+          (file) => file.type.indexOf("image") !== -1
+        );
+
+        if (imageFile) {
+          event.preventDefault();
+          const reader = new FileReader();
+          reader.onload = (readerEvent) => {
+            const base64 = readerEvent.target?.result as string;
+            if (base64) {
+              // Get drop position
+              const coordinates = view.posAtCoords({
+                left: event.clientX,
+                top: event.clientY,
+              });
+
+              if (coordinates) {
+                const { state, dispatch } = view;
+                const { pos } = coordinates;
+
+                // Create image node
+                const imageNode = state.schema.nodes.image.create({
+                  src: base64,
+                });
+
+                // Insert image at drop position
+                const tr = state.tr.insert(pos, imageNode);
+                dispatch(tr);
+              }
+            }
+          };
+          reader.onerror = () => {
+            console.error("Failed to read image file");
+          };
+          reader.readAsDataURL(imageFile);
+          return true; // Handled
+        }
+        return false; // Let TipTap handle other drop events
+      },
     },
   });
 
@@ -887,7 +970,7 @@ export const Editor = forwardRef<any, EditorProps>(function Editor(
             isActive={editor.isActive("bold")}
             title="Bold (⌘B)"
           >
-            <strong className="font-bold text-sm">B</strong>
+            <strong className="text-sm font-bold">B</strong>
           </ToolbarButton>
 
           {/* Italic */}
@@ -899,7 +982,7 @@ export const Editor = forwardRef<any, EditorProps>(function Editor(
             isActive={editor.isActive("italic")}
             title="Italic (⌘I)"
           >
-            <em className="italic text-sm">I</em>
+            <em className="text-sm italic">I</em>
           </ToolbarButton>
 
           {/* Underline */}
@@ -935,7 +1018,7 @@ export const Editor = forwardRef<any, EditorProps>(function Editor(
             isActive={editor.isActive("code")}
             title="Code"
           >
-            <span className="text-xs font-mono">&lt;/&gt;</span>
+            <span className="font-mono text-xs">&lt;/&gt;</span>
           </ToolbarButton>
 
           <ToolbarSeparator />

@@ -1,4 +1,4 @@
-// Shared types for Intellirite
+// Shared types for Pensyl
 
 export interface FileItem {
   id: string;

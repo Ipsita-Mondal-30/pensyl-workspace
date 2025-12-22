@@ -1,14 +1,20 @@
-
 "use client";
 import { useState, useRef, useEffect } from "react";
 import { ChevronRightIcon } from "../ui/Icons";
-import { getAvailableModels, type BackendModel } from "../../services/backend-ai.service";
+import {
+  getAvailableModels,
+  type BackendModel,
+} from "../../services/backend-ai.service";
 import ReactMarkdown from "react-markdown";
 import { useAIChat } from "../../hooks/useAIChat";
 import type { Editor } from "@tiptap/react";
 import { PatchPreview } from "./PatchPreview";
-import { parseAIResponse, applyPatch, applyPatches, type Patch } from "../../utils/patchParser";
-
+import {
+  parseAIResponse,
+  applyPatch,
+  applyPatches,
+  type Patch,
+} from "../../utils/patchParser";
 
 interface Message {
   id: string;
@@ -51,7 +57,7 @@ export function ChatPanel({
       id: "1",
       role: "assistant",
       content:
-        "Hello! I'm Intellirite AI, your intelligent research paper assistant.\n\nI can help you:\n- Answer questions about your research paper\n- Explain concepts and improve your writing\n- Edit and enhance your paper\n- Reference multiple files with @filename\n\nI have access to your current file and can see the full context. Just ask me anything!",
+        "Hello! I'm Pensyl AI, your intelligent research paper assistant.\n\nI can help you:\n- Answer questions about your research paper\n- Explain concepts and improve your writing\n- Edit and enhance your paper\n- Reference multiple files with @filename\n\nI have access to your current file and can see the full context. Just ask me anything!",
       timestamp: new Date(),
     },
   ]);
@@ -66,23 +72,27 @@ export function ChatPanel({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const [contextFiles, setContextFiles] = useState<string[]>([]);
-  
+
   // AI Chat hook for context awareness
   const { sendAIMessage, extractFileReferences } = useAIChat();
-  
+
   // Get current file content from editor
-  const currentFileContent = editor ? (editor.getText ? editor.getText() : editor.state?.doc?.textContent || '') : '';
-  
+  const currentFileContent = editor
+    ? editor.getText
+      ? editor.getText()
+      : editor.state?.doc?.textContent || ""
+    : "";
+
   // Debug: Log when content changes
   useEffect(() => {
-    console.log('📝 ChatPanel context updated:', {
+    console.log("📝 ChatPanel context updated:", {
       hasEditor: !!editor,
       contentLength: currentFileContent?.length || 0,
       fileName: currentFileName,
-      filePath: currentFilePath
+      filePath: currentFilePath,
     });
   }, [editor, currentFileContent, currentFileName, currentFilePath]);
-  
+
   // Update context files indicator when props change
   useEffect(() => {
     const files: string[] = [];
@@ -111,12 +121,12 @@ export function ChatPanel({
           }
         } else {
           // No models available from backend, use a fallback default
-          console.warn('No models available from backend, using fallback');
+          console.warn("No models available from backend, using fallback");
           setSelectedModel("openrouter/deepseek-chat");
         }
       })
       .catch((error) => {
-        console.error('Failed to load models from backend:', error);
+        console.error("Failed to load models from backend:", error);
         // Set a default model ID if backend fails
         setSelectedModel("openrouter/deepseek-chat");
       });
@@ -166,105 +176,108 @@ export function ChatPanel({
 
   // Handle accepting a patch
   const handleAcceptPatch = async (patch: Patch) => {
-    console.log('🔧 Applying patch:', patch);
-    
+    console.log("🔧 Applying patch:", patch);
+
     if (!editor) {
-      console.error('❌ Cannot apply patch: no editor instance');
-      alert('Editor not available. Please try again.');
+      console.error("❌ Cannot apply patch: no editor instance");
+      alert("Editor not available. Please try again.");
       return;
     }
 
     try {
       // Get current content from editor
-      let currentContent = '';
-      
+      let currentContent = "";
+
       // Try multiple methods to get content
-      if (typeof editor.getText === 'function') {
+      if (typeof editor.getText === "function") {
         currentContent = editor.getText();
-      } else if (typeof editor.getHTML === 'function') {
+      } else if (typeof editor.getHTML === "function") {
         // Convert HTML to text if needed
         const html = editor.getHTML();
-        const tempDiv = document.createElement('div');
+        const tempDiv = document.createElement("div");
         tempDiv.innerHTML = html;
-        currentContent = tempDiv.textContent || '';
+        currentContent = tempDiv.textContent || "";
       } else if (editor.state?.doc) {
-        currentContent = editor.state.doc.textContent || '';
+        currentContent = editor.state.doc.textContent || "";
       }
-      
-      console.log('📄 Current content length:', currentContent.length);
-      console.log('📝 First 100 chars:', currentContent.substring(0, 100));
-      
+
+      console.log("📄 Current content length:", currentContent.length);
+      console.log("📝 First 100 chars:", currentContent.substring(0, 100));
+
       if (!currentContent) {
-        console.warn('⚠️ Editor content is empty, using empty string');
-        currentContent = '';
+        console.warn("⚠️ Editor content is empty, using empty string");
+        currentContent = "";
       }
-      
+
       // Apply the patch - explicitly type patch to ensure compatibility
       const newContent = applyPatch(currentContent, patch as Patch);
-      
-      console.log('✨ New content length:', newContent.length);
-      console.log('📝 First 100 chars:', newContent.substring(0, 100));
-      
+
+      console.log("✨ New content length:", newContent.length);
+      console.log("📝 First 100 chars:", newContent.substring(0, 100));
+
       // Update editor - use commands API for TipTap
       if (editor.commands) {
         // Clear and set new content
         editor.commands.setContent(newContent);
-        console.log('✅ Patch applied via TipTap commands');
+        console.log("✅ Patch applied via TipTap commands");
       } else if (onReplaceInEditor) {
         // Fallback to parent handler
         onReplaceInEditor(newContent);
-        console.log('✅ Patch applied via replace handler');
+        console.log("✅ Patch applied via replace handler");
       } else {
-        console.error('❌ No method to update editor');
-        alert('Cannot update editor. Please try manually copying the content.');
+        console.error("❌ No method to update editor");
+        alert("Cannot update editor. Please try manually copying the content.");
         return;
       }
-      
+
       // Show success message
-      console.log('✅ Patch applied successfully!');
-      
+      console.log("✅ Patch applied successfully!");
+
       // Optional: Show a brief success indicator
       // You could add a toast notification here
-      
     } catch (error) {
-      console.error('❌ Error applying patch:', error);
-      alert(`Failed to apply patch: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error("❌ Error applying patch:", error);
+      alert(
+        `Failed to apply patch: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
     }
   };
 
   // Handle rejecting a patch
   const handleRejectPatch = (patch: Patch) => {
-    console.log('❌ Patch rejected:', patch);
+    console.log("❌ Patch rejected:", patch);
     // Optionally, remove the patch from the message
   };
 
   // Handle accepting all patches
   const handleAcceptAllPatches = async (patches: Patch[]) => {
-    console.log('🔧 Applying all patches:', patches.length);
-    
+    console.log("🔧 Applying all patches:", patches.length);
+
     if (!editor) {
-      console.error('❌ Cannot apply patches: no editor instance');
-      alert('Editor not available. Please try again.');
+      console.error("❌ Cannot apply patches: no editor instance");
+      alert("Editor not available. Please try again.");
       return;
     }
 
     try {
       // Get current content from editor
-      let currentContent = '';
-      
-      if (typeof editor.getText === 'function') {
+      let currentContent = "";
+
+      if (typeof editor.getText === "function") {
         currentContent = editor.getText();
       } else if (editor.state?.doc) {
-        currentContent = editor.state.doc.textContent || '';
+        currentContent = editor.state.doc.textContent || "";
       }
-      
-      console.log('📄 Current content length:', currentContent.length);
-      
+
+      console.log("📄 Current content length:", currentContent.length);
+
       // Apply all patches in sequence
       const newContent = applyPatches(currentContent, patches);
-      
-      console.log('✨ New content length:', newContent.length);
-      
+
+      console.log("✨ New content length:", newContent.length);
+
       // Update editor
       if (editor.commands) {
         editor.commands.setContent(newContent);
@@ -273,10 +286,13 @@ export function ChatPanel({
         onReplaceInEditor(newContent);
         console.log(`✅ Applied ${patches.length} patches via replace handler`);
       }
-      
     } catch (error) {
-      console.error('❌ Error applying patches:', error);
-      alert(`Failed to apply patches: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error("❌ Error applying patches:", error);
+      alert(
+        `Failed to apply patches: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
     }
   };
 
@@ -316,18 +332,14 @@ export function ChatPanel({
       abortControllerRef.current = new AbortController();
 
       // Send message with full context (editor, files, etc.)
-      for await (const chunk of sendAIMessage(
-        userInput,
-        messages,
-        {
-          editor: editor || undefined,
-          currentFilePath,
-          currentFileName,
-          workspacePath,
-          cursorInfo: cursorPosition,
-          selectedModelId: selectedModel, // Pass selected model ID
-        }
-      )) {
+      for await (const chunk of sendAIMessage(userInput, messages, {
+        editor: editor || undefined,
+        currentFilePath,
+        currentFileName,
+        workspacePath,
+        cursorInfo: cursorPosition,
+        selectedModelId: selectedModel, // Pass selected model ID
+      })) {
         if (abortControllerRef.current?.signal.aborted) {
           break;
         }
@@ -344,17 +356,20 @@ export function ChatPanel({
       }
 
       // Parse response for patches after streaming completes
-      const { hasPatches, patches, textContent } = parseAIResponse(fullResponse);
-      
+      const { hasPatches, patches, textContent } = parseAIResponse(
+        fullResponse,
+        currentFileName || undefined
+      );
+
       // Update message with parsed patches
       setMessages((prev) =>
         prev.map((msg) =>
           msg.id === assistantMessageId
-            ? { 
-                ...msg, 
+            ? {
+                ...msg,
                 content: textContent || fullResponse,
                 hasPatches,
-                patches
+                patches,
               }
             : msg
         )
@@ -406,7 +421,7 @@ export function ChatPanel({
       {/* Header */}
       <div className="h-10 flex items-center justify-between px-3 border-b border-[var(--border-primary)] shrink-0">
         <h2 className="text-sm font-semibold text-[var(--text-primary)]">
-          Intellirite Chat
+          Pensyl Chat
         </h2>
         <button
           onClick={onToggleCollapse}
@@ -418,7 +433,7 @@ export function ChatPanel({
       </div>
 
       {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="overflow-y-auto flex-1">
         <div className="px-4 py-4 space-y-6">
           {messages.map((message) => (
             <MessageBubble
@@ -452,7 +467,7 @@ export function ChatPanel({
             className="text-[11px] px-2 py-1 bg-[var(--bg-primary)] hover:bg-[var(--bg-hover)] border border-[var(--border-primary)] rounded text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all duration-150 flex items-center gap-1.5 group"
             title="Select AI model"
           >
-            <span className="font-medium text-xs">
+            <span className="text-xs font-medium">
               {availableModels.find((m) => m.id === selectedModel)?.name ||
                 selectedModel ||
                 "Select Model"}
@@ -580,7 +595,7 @@ export function ChatPanel({
                               }
                             `}
                           >
-                            <div className="flex items-center justify-between gap-2">
+                            <div className="flex gap-2 justify-between items-center">
                               <div className="flex items-center gap-1.5 flex-1 min-w-0">
                                 <span className="text-[9px] opacity-70 shrink-0">
                                   {costBadge}
@@ -696,7 +711,7 @@ export function ChatPanel({
                   abortControllerRef.current?.abort();
                   setIsLoading(false);
                 }}
-                className="w-7 h-7 flex items-center justify-center bg-red-600 hover:bg-red-700 rounded transition-colors text-white"
+                className="flex justify-center items-center w-7 h-7 text-white bg-red-600 rounded transition-colors hover:bg-red-700"
                 aria-label="Stop generation"
                 title="Stop"
               >
@@ -794,7 +809,9 @@ function MessageBubble({
 
   return (
     <div
-      className={`group flex flex-col w-full ${isUser ? "items-end" : "items-start"}`}
+      className={`group flex flex-col w-full ${
+        isUser ? "items-end" : "items-start"
+      }`}
       onMouseEnter={() => setShowActions(true)}
       onMouseLeave={() => setShowActions(false)}
       draggable={!isUser}
@@ -802,174 +819,180 @@ function MessageBubble({
       onDragEnd={handleDragEnd}
     >
       {/* Patches Preview (if any) - Show BEFORE the message bubble */}
-      {!isUser && message.hasPatches && message.patches && message.patches.length > 0 && (
-        <div className="w-full mb-3">
-          <PatchPreview
-            patches={message.patches}
-            currentFileContent={currentFileContent || ''}
-            currentFileName={currentFileName || 'file'}
-            onAcceptPatch={onAcceptPatch!}
-            onRejectPatch={onRejectPatch!}
-            onAcceptAll={() => onAcceptAllPatches!(message.patches!)}
-            onRejectAll={() => onRejectAllPatches!(message.patches!)}
-          />
-        </div>
-      )}
+      {!isUser &&
+        message.hasPatches &&
+        message.patches &&
+        message.patches.length > 0 && (
+          <div className="mb-3 w-full">
+            <PatchPreview
+              patches={message.patches}
+              currentFileContent={currentFileContent || ""}
+              currentFileName={currentFileName || "file"}
+              onAcceptPatch={onAcceptPatch!}
+              onRejectPatch={onRejectPatch!}
+              onAcceptAll={() => onAcceptAllPatches!(message.patches!)}
+              onRejectAll={() => onRejectAllPatches!(message.patches!)}
+            />
+          </div>
+        )}
 
       {/* Message Bubble - Only show text content, not the raw patch XML */}
       {message.content && message.content.trim().length > 0 && (
-      <div className="w-full flex flex-col">
-        <div
-          className={`
+        <div className="flex flex-col w-full">
+          <div
+            className={`
             relative w-full rounded-lg px-4 py-3 mb-1
             ${
               isUser
-                ? "bg-[var(--accent-primary)] text-white"
-                : "bg-[var(--bg-primary)] text-[var(--text-primary)] border border-[var(--border-primary)]"
+                ? "text-white bg-[var(--accent-primary)]"
+                : "border bg-[var(--bg-primary)] text-[var(--text-primary)] border-[var(--border-primary)]"
             }
-            ${isDragging ? "opacity-50" : ""}
-          `}
-        >
-          {/* Action Buttons (hover) - positioned inside the bubble, top right */}
-          {!isUser && showActions && (
-            <div className="absolute top-2 right-2 flex items-center gap-1.5 z-10">
-              <button
-                onClick={() => {
-                  navigator.clipboard.writeText(message.content);
-                  // Optional: show toast notification
-                }}
-                className="w-7 h-7 flex items-center justify-center bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] border border-[var(--border-primary)] rounded text-xs text-[var(--text-primary)] transition-colors shadow-sm"
-                title="Copy to clipboard"
-              >
-                📋
-              </button>
-              <button
-                onClick={() => onInsert?.(message.content)}
-                className="w-7 h-7 flex items-center justify-center bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] border border-[var(--border-primary)] rounded text-xs text-[var(--text-primary)] transition-colors shadow-sm"
-                title="Insert into editor"
-              >
-                +
-              </button>
-              <button
-                onClick={() => onReplace?.(message.content)}
-                className="w-7 h-7 flex items-center justify-center bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] border border-[var(--border-primary)] rounded text-xs text-[var(--text-primary)] transition-colors shadow-sm"
-                title="Replace in editor"
-              >
-                ↻
-              </button>
-            </div>
-          )}
-
-          {/* Message Content */}
-          <div className="text-sm break-words pr-12">
-            {message.content ? (
-              message.role === "assistant" ? (
-                <ReactMarkdown
-                  components={{
-                    p: ({ children }) => (
-                      <p className="mb-2 last:mb-0 text-[var(--text-primary)] leading-relaxed">
-                        {children}
-                      </p>
-                    ),
-                    code: ({ children, className }) => {
-                      const isInline = !className;
-                      return isInline ? (
-                        <code className="bg-[var(--bg-secondary)] px-1.5 py-0.5 rounded text-xs font-mono text-[var(--accent-primary)]">
-                          {children}
-                        </code>
-                      ) : (
-                        <code className="block bg-[var(--bg-secondary)] p-3 rounded text-xs font-mono overflow-x-auto text-[var(--text-primary)] my-2 border border-[var(--border-primary)]">
-                          {children}
-                        </code>
-                      );
-                    },
-                    pre: ({ children }) => (
-                      <pre className="bg-[var(--bg-secondary)] p-3 rounded text-xs font-mono overflow-x-auto mb-2 text-[var(--text-primary)] border border-[var(--border-primary)]">
-                        {children}
-                      </pre>
-                    ),
-                    ul: ({ children }) => (
-                      <ul className="list-disc list-inside mb-2 space-y-1.5 text-[var(--text-primary)] ml-2">
-                        {children}
-                      </ul>
-                    ),
-                    ol: ({ children }) => (
-                      <ol className="list-decimal list-inside mb-2 space-y-1.5 text-[var(--text-primary)] ml-2">
-                        {children}
-                      </ol>
-                    ),
-                    li: ({ children }) => <li className="ml-1">{children}</li>,
-                    strong: ({ children }) => (
-                      <strong className="font-semibold text-[var(--text-primary)]">
-                        {children}
-                      </strong>
-                    ),
-                    em: ({ children }) => <em className="italic">{children}</em>,
-                    h1: ({ children }) => (
-                      <h1 className="text-lg font-bold mb-2 mt-3 first:mt-0 text-[var(--text-primary)]">
-                        {children}
-                      </h1>
-                    ),
-                    h2: ({ children }) => (
-                      <h2 className="text-base font-bold mb-2 mt-3 first:mt-0 text-[var(--text-primary)]">
-                        {children}
-                      </h2>
-                    ),
-                    h3: ({ children }) => (
-                      <h3 className="text-sm font-bold mb-1 mt-2 first:mt-0 text-[var(--text-primary)]">
-                        {children}
-                      </h3>
-                    ),
-                    blockquote: ({ children }) => (
-                      <blockquote className="border-l-2 border-[var(--border-primary)] pl-3 italic my-2 text-[var(--text-secondary)]">
-                        {children}
-                      </blockquote>
-                    ),
-                    a: ({ children, href }) => (
-                      <a
-                        href={href}
-                        className="text-[var(--accent-primary)] hover:underline"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        {children}
-                      </a>
-                    ),
+            ${isDragging ? "opacity-50" : ""}`}
+          >
+            {/* Action Buttons (hover) - positioned inside the bubble, top right */}
+            {!isUser && showActions && (
+              <div className="absolute top-2 right-2 flex items-center gap-1.5 z-10">
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(message.content);
+                    // Optional: show toast notification
                   }}
+                  className="w-7 h-7 flex items-center justify-center bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] border border-[var(--border-primary)] rounded text-xs text-[var(--text-primary)] transition-colors shadow-sm"
+                  title="Copy to clipboard"
                 >
-                  {message.content}
-                </ReactMarkdown>
+                  📋
+                </button>
+                <button
+                  onClick={() => onInsert?.(message.content)}
+                  className="w-7 h-7 flex items-center justify-center bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] border border-[var(--border-primary)] rounded text-xs text-[var(--text-primary)] transition-colors shadow-sm"
+                  title="Insert into editor"
+                >
+                  +
+                </button>
+                <button
+                  onClick={() => onReplace?.(message.content)}
+                  className="w-7 h-7 flex items-center justify-center bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] border border-[var(--border-primary)] rounded text-xs text-[var(--text-primary)] transition-colors shadow-sm"
+                  title="Replace in editor"
+                >
+                  ↻
+                </button>
+              </div>
+            )}
+
+            {/* Message Content */}
+            <div className="pr-12 text-sm break-words">
+              {message.content ? (
+                message.role === "assistant" ? (
+                  <ReactMarkdown
+                    components={{
+                      p: ({ children }) => (
+                        <p className="mb-2 last:mb-0 text-[var(--text-primary)] leading-relaxed">
+                          {children}
+                        </p>
+                      ),
+                      code: ({ children, className }) => {
+                        const isInline = !className;
+                        return isInline ? (
+                          <code className="bg-[var(--bg-secondary)] px-1.5 py-0.5 rounded text-xs font-mono text-[var(--accent-primary)]">
+                            {children}
+                          </code>
+                        ) : (
+                          <code className="block bg-[var(--bg-secondary)] p-3 rounded text-xs font-mono overflow-x-auto text-[var(--text-primary)] my-2 border border-[var(--border-primary)]">
+                            {children}
+                          </code>
+                        );
+                      },
+                      pre: ({ children }) => (
+                        <pre className="bg-[var(--bg-secondary)] p-3 rounded text-xs font-mono overflow-x-auto mb-2 text-[var(--text-primary)] border border-[var(--border-primary)]">
+                          {children}
+                        </pre>
+                      ),
+                      ul: ({ children }) => (
+                        <ul className="list-disc list-inside mb-2 space-y-1.5 text-[var(--text-primary)] ml-2">
+                          {children}
+                        </ul>
+                      ),
+                      ol: ({ children }) => (
+                        <ol className="list-decimal list-inside mb-2 space-y-1.5 text-[var(--text-primary)] ml-2">
+                          {children}
+                        </ol>
+                      ),
+                      li: ({ children }) => (
+                        <li className="ml-1">{children}</li>
+                      ),
+                      strong: ({ children }) => (
+                        <strong className="font-semibold text-[var(--text-primary)]">
+                          {children}
+                        </strong>
+                      ),
+                      em: ({ children }) => (
+                        <em className="italic">{children}</em>
+                      ),
+                      h1: ({ children }) => (
+                        <h1 className="text-lg font-bold mb-2 mt-3 first:mt-0 text-[var(--text-primary)]">
+                          {children}
+                        </h1>
+                      ),
+                      h2: ({ children }) => (
+                        <h2 className="text-base font-bold mb-2 mt-3 first:mt-0 text-[var(--text-primary)]">
+                          {children}
+                        </h2>
+                      ),
+                      h3: ({ children }) => (
+                        <h3 className="text-sm font-bold mb-1 mt-2 first:mt-0 text-[var(--text-primary)]">
+                          {children}
+                        </h3>
+                      ),
+                      blockquote: ({ children }) => (
+                        <blockquote className="border-l-2 border-[var(--border-primary)] pl-3 italic my-2 text-[var(--text-secondary)]">
+                          {children}
+                        </blockquote>
+                      ),
+                      a: ({ children, href }) => (
+                        <a
+                          href={href}
+                          className="text-[var(--accent-primary)] hover:underline"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          {children}
+                        </a>
+                      ),
+                    }}
+                  >
+                    {message.content}
+                  </ReactMarkdown>
+                ) : (
+                  <div className="whitespace-pre-wrap text-[var(--text-primary)] leading-relaxed">
+                    {message.content}
+                  </div>
+                )
               ) : (
-                <div className="whitespace-pre-wrap text-[var(--text-primary)] leading-relaxed">
-                  {message.content}
-                </div>
-              )
-            ) : (
-              <span className="text-[var(--text-tertiary)] italic">
-                Thinking...
-              </span>
+                <span className="text-[var(--text-tertiary)] italic">
+                  Thinking...
+                </span>
+              )}
+            </div>
+
+            {/* Loading indicator for streaming */}
+            {!message.content && message.role === "assistant" && (
+              <div className="flex items-center gap-1.5 mt-2">
+                <div className="w-1.5 h-1.5 bg-[var(--accent-primary)] rounded-full animate-pulse" />
+                <div className="w-1.5 h-1.5 bg-[var(--accent-primary)] rounded-full animate-pulse delay-75" />
+                <div className="w-1.5 h-1.5 bg-[var(--accent-primary)] rounded-full animate-pulse delay-150" />
+              </div>
             )}
           </div>
 
-          {/* Loading indicator for streaming */}
-          {!message.content && message.role === "assistant" && (
-            <div className="flex items-center gap-1.5 mt-2">
-              <div className="w-1.5 h-1.5 bg-[var(--accent-primary)] rounded-full animate-pulse" />
-              <div className="w-1.5 h-1.5 bg-[var(--accent-primary)] rounded-full animate-pulse delay-75" />
-              <div className="w-1.5 h-1.5 bg-[var(--accent-primary)] rounded-full animate-pulse delay-150" />
-            </div>
-          )}
+          {/* Timestamp */}
+          <div
+            className={`text-[11px] mt-1.5 px-1 ${
+              isUser ? "text-white/70" : "text-[var(--text-tertiary)]"
+            }`}
+          >
+            {formatTime(message.timestamp)}
+          </div>
         </div>
-
-        {/* Timestamp */}
-        <div
-          className={`text-[11px] mt-1.5 px-1 ${
-            isUser ? "text-white/70" : "text-[var(--text-tertiary)]"
-          }`}
-        >
-          {formatTime(message.timestamp)}
-        </div>
-      </div>
       )}
     </div>
   );

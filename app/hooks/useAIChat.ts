@@ -32,6 +32,46 @@ export function useAIChat() {
         return Array.from(matches, m => m[1]);
     }, []);
 
+    /**
+     * Format document with line numbers for AI context
+     * Ensures proper alignment: line numbers are right-aligned in a fixed-width column
+     */
+    const formatDocumentWithLineNumbers = useCallback((content: string): string => {
+        const lines = content.split('\n');
+        const formattedLines: string[] = [];
+        let currentSection = '';
+        
+        // Calculate max line number width for alignment (e.g., if max is 100, width is 3)
+        const maxLineNumber = lines.length;
+        const lineNumberWidth = Math.max(3, maxLineNumber.toString().length);
+
+        lines.forEach((line, index) => {
+            const lineNumber = index + 1;
+            const trimmedLine = line.trim();
+
+            // Detect section markers (headings in markdown)
+            if (trimmedLine.match(/^#{1,6}\s+.+$/)) {
+                const sectionName = trimmedLine.replace(/^#+\s+/, '');
+                if (currentSection) {
+                    formattedLines.push(`[Section: ${currentSection} ends at line ${lineNumber - 1}]`);
+                }
+                currentSection = sectionName;
+                formattedLines.push(`[Section: ${currentSection} starts at line ${lineNumber}]`);
+            }
+
+            // Format line with right-aligned line number: "  1: content" or "100: content"
+            const lineNumberStr = lineNumber.toString().padStart(lineNumberWidth, ' ');
+            formattedLines.push(`${lineNumberStr}: ${line}`);
+        });
+
+        // Add final section marker
+        if (currentSection && lines.length > 0) {
+            formattedLines.push(`[Section: ${currentSection} ends at line ${lines.length}]`);
+        }
+
+        return formattedLines.join('\n');
+    }, []);
+
     const loadFileContent = useCallback(async (fileName: string, workspacePath?: string): Promise<string | null> => {
         try {
             let filePath = fileName;
@@ -75,7 +115,9 @@ export function useAIChat() {
             // Add current file context if available
             if (options.editor && options.currentFileName) {
                 const editorContent = options.editor.getText();
-                fullContext = `Current file: ${options.currentFileName}\n\n${editorContent}\n\nUser request: ${userMessage}`;
+                // Format document with line numbers for document editing operations
+                const formattedContent = formatDocumentWithLineNumbers(editorContent);
+                fullContext = `Current file: ${options.currentFileName}\n\n${formattedContent}\n\nUser request: ${userMessage}`;
             }
 
             // Load referenced files
@@ -119,7 +161,7 @@ export function useAIChat() {
         } finally {
             setIsProcessing(false);
         }
-    }, [extractFileReferences, loadFileContent]);
+    }, [extractFileReferences, loadFileContent, formatDocumentWithLineNumbers]);
 
     return {
         sendAIMessage,

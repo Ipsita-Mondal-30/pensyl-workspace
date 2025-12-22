@@ -1272,7 +1272,7 @@ function App() {
             ) : (
               <div className="flex flex-col flex-1 gap-4 justify-center items-center p-8">
                 <h1 className="text-xl font-semibold text-[var(--text-white)]">
-                  Intellirite
+                  Pensyl
                 </h1>
                 <p className="text-md text-[var(--text-secondary)]">
                   Desktop Writing IDE

@@ -9,6 +9,7 @@
 
 import { streamMessageToGemini, type ChatMessage as GeminiChatMessage } from './gemini';
 import { streamAI, type BackendModel } from './backend-ai.service';
+import { aiOrchestrationClient } from '../lib/ai-orchestration-client';
 
 export type AIProvider = 'backend' | 'gemini';
 
@@ -46,7 +47,33 @@ export function setAIProvider(provider: AIProvider): void {
 }
 
 /**
+ * Detect if this is a document editing request
+ */
+function isDocumentEditRequest(userMessage: string, context?: string): boolean {
+  const messageLower = userMessage.toLowerCase();
+  const contextLower = context?.toLowerCase() || '';
+  
+  // Check if message contains document editing keywords
+  const editKeywords = [
+    'add', 'insert', 'update', 'fix', 'complete', 'fill in', 'fill in the',
+    'delete', 'remove', 'edit', 'modify', 'change', 'append', 'conclusion',
+    'section', 'paragraph', 'content'
+  ];
+  const hasEditKeyword = editKeywords.some(keyword => messageLower.includes(keyword));
+  
+  // Check if context contains line-numbered document (format: "  1: content" or "100: content")
+  // Look for pattern like "  1:" or "100:" (right-aligned numbers followed by colon and space)
+  const hasLineNumbers = /\d+:\s/.test(contextLower);
+  
+  // If we have edit keywords and context appears to be a document (has "Current file:" or line numbers)
+  const hasDocumentContext = contextLower.includes('current file:') || hasLineNumbers;
+  
+  return hasEditKeyword && hasDocumentContext;
+}
+
+/**
  * Stream a message using the backend AI API (OpenRouter models)
+ * Uses orchestration for document editing requests, direct execute for others
  */
 async function* streamMessageViaBackend(
   messages: ChatMessage[],
@@ -64,25 +91,85 @@ async function* streamMessageViaBackend(
     ? contextMessages.map(msg => `${msg.role}: ${msg.content}`).join('\n\n')
     : options.context;
 
+  // Check if this is a document editing request
+  const useOrchestration = isDocumentEditRequest(lastMessage.content, context || options.context);
+  
+  console.log('[AIService] Document edit detection:', {
+    userMessage: lastMessage.content.substring(0, 100),
+    hasContext: !!(context || options.context),
+    contextPreview: (context || options.context || '').substring(0, 200),
+    useOrchestration,
+  });
+
   try {
-    // Call backend AI execute API
-    yield* streamAI(
-      {
-        task: 'generate',
-        input: lastMessage.content,
-        context,
+    if (useOrchestration) {
+      // Use orchestration endpoint for document editing
+      console.log('[AIService] ✅ Using orchestration for document editing request');
+      console.log('[AIService] Sending to orchestration:', {
+        prompt: lastMessage.content,
+        contextLength: (context || options.context || '').length,
+      });
+      
+      const response = await aiOrchestrationClient.orchestrate({
+        prompt: lastMessage.content,
+        context: context || options.context,
         metadata: {
           ...options.metadata,
           messageHistory: contextMessages.length,
+          selectedModelId: options.selectedModelId,
         },
-      },
-      options.selectedModelId
-    );
+      });
 
-    console.log('✅ Backend AI Response completed');
+      console.log('[AIService] ✅ Orchestration response received:', {
+        intent: response.intent,
+        agents: response.agents,
+        outputLength: response.output?.length || 0,
+        outputPreview: response.output?.substring(0, 500),
+        errors: response.errors,
+        metadata: response.metadata,
+      });
+
+      // Yield the output (orchestration returns complete response, not streamed)
+      // But we'll simulate streaming by chunking it
+      const output = response.output || '';
+      const chunkSize = 50; // Characters per chunk for simulated streaming
+      for (let i = 0; i < output.length; i += chunkSize) {
+        yield output.substring(i, i + chunkSize);
+        // Small delay to simulate streaming
+        await new Promise(resolve => setTimeout(resolve, 10));
+      }
+      
+      console.log('✅ Backend Orchestration Response completed');
+    } else {
+      // Use direct execute API for regular requests
+      yield* streamAI(
+        {
+          task: 'generate',
+          input: lastMessage.content,
+          context,
+          metadata: {
+            ...options.metadata,
+            messageHistory: contextMessages.length,
+          },
+        },
+        options.selectedModelId
+      );
+
+      console.log('✅ Backend AI Response completed');
+    }
 
   } catch (error: any) {
-    console.error('Backend AI API error:', error);
+    console.error('[AIService] Backend AI API error:', error);
+    
+    // If orchestration failed for document editing, don't fall back to direct execute
+    // because direct execute won't generate patches - it will just echo the document
+    if (useOrchestration) {
+      console.error('[AIService] Orchestration failed for document editing request. Cannot fall back to direct execute as it won\'t generate patches.');
+      throw new Error(
+        `Document editing failed: ${error?.message || 'Orchestration endpoint unavailable'}. Please ensure the backend server is running at ${process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001'}`
+      );
+    }
+    
     throw new Error(
       `Backend AI failed: ${error?.message || 'Unknown error'}. Try using Gemini provider as fallback.`
     );

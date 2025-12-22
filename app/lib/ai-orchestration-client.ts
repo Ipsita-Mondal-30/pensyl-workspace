@@ -105,24 +105,36 @@ export class AIOrchestrationClient {
    * Orchestrate AI request
    */
   async orchestrate(request: OrchestrationRequest): Promise<OrchestrationResponse> {
-    const response = await fetch(`${this.apiUrl}/api/ai/orchestrate`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Session-ID': this.sessionId,
-      },
-      credentials: 'include',
-      body: JSON.stringify(request),
-    });
+    try {
+      const response = await fetch(`${this.apiUrl}/api/ai/orchestrate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Session-ID': this.sessionId,
+        },
+        credentials: 'include',
+        body: JSON.stringify(request),
+      });
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(
-        errorData.error?.message || `Orchestration API error: ${response.status}`,
-      );
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.error?.message || `Orchestration API error: ${response.status} ${response.statusText}`;
+        console.error('[AIOrchestrationClient] Orchestration failed:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorData,
+        });
+        throw new Error(errorMessage);
+      }
+
+      return response.json();
+    } catch (error: any) {
+      console.error('[AIOrchestrationClient] Fetch error:', error);
+      if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+        throw new Error(`Cannot connect to backend at ${this.apiUrl}. Is the backend server running?`);
+      }
+      throw error;
     }
-
-    return response.json();
   }
 
   /**
