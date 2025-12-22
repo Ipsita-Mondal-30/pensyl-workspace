@@ -72,6 +72,10 @@ export function ChatPanel({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const [contextFiles, setContextFiles] = useState<string[]>([]);
+  const [showPatchTest, setShowPatchTest] = useState(false);
+  const [patchTestLineNumber, setPatchTestLineNumber] = useState<string>("");
+  const [patchTestText, setPatchTestText] = useState<string>("");
+  const [showLineViewer, setShowLineViewer] = useState(false);
 
   // AI Chat hook for context awareness
   const { sendAIMessage, extractFileReferences } = useAIChat();
@@ -174,6 +178,399 @@ export function ChatPanel({
     return date.toLocaleDateString();
   };
 
+  // Helper: Count block nodes (visual lines) in the document
+  const countBlockNodes = (editor: Editor | null): number => {
+    if (!editor) return 0;
+    const { state } = editor.view;
+    const { doc } = state;
+    let count = 0;
+    doc.descendants((node) => {
+      if (
+        node.isBlock &&
+        (node.type.name === "paragraph" ||
+          node.type.name.startsWith("heading") ||
+          node.type.name === "codeBlock" ||
+          node.type.name === "blockquote")
+      ) {
+        count++;
+      }
+      return true;
+    });
+    return count;
+  };
+
+  // Helper: Generate JSON with line-wise text for debugging
+  const generateLineWiseJSON = (): string => {
+    if (!editor) {
+      return JSON.stringify({ error: "Editor not available" }, null, 2);
+    }
+
+    const { state } = editor.view;
+    const { doc } = state;
+    const lines: Array<{
+      lineNumber: number;
+      type: string;
+      text: string;
+      textPreview: string;
+      isEmpty: boolean;
+      charCount: number;
+      estimatedVisualLines: number;
+      position: number;
+      endPosition: number;
+      nodeSize: number;
+    }> = [];
+
+    let lineNumber = 1;
+    doc.descendants((node, pos) => {
+      if (
+        node.isBlock &&
+        (node.type.name === "paragraph" ||
+          node.type.name.startsWith("heading") ||
+          node.type.name === "codeBlock" ||
+          node.type.name === "blockquote")
+      ) {
+        const text = node.textContent || "";
+        const isEmpty = text.trim() === "";
+        const charCount = text.length;
+        // Estimate visual lines (assuming ~80 chars per line)
+        const estimatedVisualLines =
+          charCount === 0 ? 1 : Math.max(1, Math.ceil(charCount / 80));
+        // Create a preview: first 100 chars or "[EMPTY]"
+        const textPreview = isEmpty
+          ? "[EMPTY]"
+          : text.substring(0, 100) + (text.length > 100 ? "..." : "");
+        const endPos = pos + node.nodeSize;
+
+        lines.push({
+          lineNumber: lineNumber++,
+          type: node.type.name,
+          text: text,
+          textPreview: textPreview,
+          isEmpty: isEmpty,
+          charCount: charCount,
+          estimatedVisualLines: estimatedVisualLines,
+          position: pos,
+          endPosition: endPos,
+          nodeSize: node.nodeSize,
+        });
+      }
+      return true;
+    });
+
+    return JSON.stringify(
+      {
+        totalLines: lines.length,
+        documentSize: doc.content.size,
+        note: "⚠️ IMPORTANT: Line numbers = Block nodes (paragraphs/headings), NOT visual wrapped lines on screen!",
+        explanation: {
+          blockNodes:
+            "Each 'line' is ONE structural element (paragraph, heading, etc.)",
+          visualLines:
+            "A long paragraph might display as 20+ visual lines but counts as 1 block",
+          emptyParagraphs: "Empty paragraphs still count as lines",
+          insertion:
+            "To insert 'at line N', we insert BEFORE the Nth block node",
+        },
+        lines: lines,
+      },
+      null,
+      2
+    );
+  };
+
+  // Helper: Find ProseMirror position for a given line number (counting block nodes)
+  // Line numbers are 1-indexed: Line 1 = first block, Line 2 = second block, etc.
+  const findBlockNodePosition = (
+    editor: Editor,
+    targetLineNum: number
+  ): number => {
+    const { state } = editor.view;
+    const { doc } = state;
+
+    // Collect all block nodes (paragraphs, headings, etc.) - each represents a visual line
+    const blockNodes: Array<{ pos: number; endPos: number; type: string }> = [];
+
+    doc.descendants((node, pos) => {
+      // Count block-level nodes that represent visual lines
+      if (
+        node.isBlock &&
+        (node.type.name === "paragraph" ||
+          node.type.name.startsWith("heading") ||
+          node.type.name === "codeBlock" ||
+          node.type.name === "blockquote")
+      ) {
+        // Get the end position of this block (after the closing tag)
+        const endPos = pos + node.nodeSize;
+        blockNodes.push({ pos, endPos, type: node.type.name });
+      }
+      return true;
+    });
+
+    console.log(`📊 Found ${blockNodes.length} block nodes in document`);
+    console.log(`🎯 Target line: ${targetLineNum}`);
+
+    // If inserting at line 1, insert at the start of the document (before first block)
+    if (targetLineNum === 1) {
+      return 1; // Position 1 is right after the document start
+    }
+
+    // If target line is beyond the last block, insert at the end
+    if (targetLineNum > blockNodes.length + 1) {
+      const lastBlock = blockNodes[blockNodes.length - 1];
+      console.log(
+        `📍 Inserting at end (after last block): ${lastBlock?.endPos}`
+      );
+      return lastBlock ? lastBlock.endPos : doc.content.size - 1;
+    }
+
+    // Line numbers map to block nodes: Line 1 = block 0, Line 2 = block 1, etc.
+    // To insert "at line N", we insert BEFORE the Nth block (index N-1)
+    // This pushes existing content down and makes new content become line N
+
+    const targetBlockIndex = targetLineNum - 1; // Convert to 0-indexed (Line 1 = block 0)
+
+    if (targetBlockIndex < 0) {
+      return 1; // Before first block
+    }
+
+    if (targetBlockIndex >= blockNodes.length) {
+      // Inserting after the last block - insert at the end
+      const lastBlock = blockNodes[blockNodes.length - 1];
+      console.log(
+        `📍 Inserting at end (after last block at line ${blockNodes.length})`
+      );
+      return lastBlock ? lastBlock.endPos : doc.content.size - 1;
+    }
+
+    // Insert BEFORE the target block
+    // In ProseMirror, to insert a block before another block, we need to find
+    // the position in the parent container (usually the document) where this block starts
+    const targetBlock = blockNodes[targetBlockIndex];
+
+    // The position from descendants is the absolute position in the document
+    // For insertContentAt, we can use this position directly - TipTap will handle
+    // inserting the block at the correct location
+    console.log(
+      `📍 Inserting BEFORE block ${targetBlockIndex} (${targetBlock.type}) at line ${targetLineNum}: pos=${targetBlock.pos}`
+    );
+
+    // Return the position of the target block - insertContentAt will insert before it
+    return targetBlock.pos;
+  };
+
+  // Handle patch test - manually apply patch at specific line
+  const handlePatchTest = () => {
+    if (!editor) {
+      alert("Editor not available");
+      return;
+    }
+
+    const lineNum = parseInt(patchTestLineNumber, 10);
+    if (isNaN(lineNum) || lineNum < 1) {
+      alert("Please enter a valid line number (>= 1)");
+      return;
+    }
+
+    if (!patchTestText.trim()) {
+      alert("Please enter text to insert");
+      return;
+    }
+
+    try {
+      const { state } = editor.view;
+      const { doc } = state;
+
+      // Count block nodes to show user how many lines exist
+      const blockNodes: Array<{ type: string; pos: number }> = [];
+      doc.descendants((node, pos) => {
+        if (
+          node.isBlock &&
+          (node.type.name === "paragraph" ||
+            node.type.name.startsWith("heading") ||
+            node.type.name === "codeBlock" ||
+            node.type.name === "blockquote")
+        ) {
+          blockNodes.push({ type: node.type.name, pos });
+        }
+        return true;
+      });
+
+      const totalLines = blockNodes.length;
+      console.log("🧪 Patch Test - Applying patch at line:", lineNum);
+      console.log(
+        "📄 Current document has",
+        totalLines,
+        "block nodes (visual lines)"
+      );
+
+      if (lineNum > totalLines + 1) {
+        alert(
+          `Line number ${lineNum} is beyond document end (${totalLines} lines). Use ${
+            totalLines + 1
+          } to insert at the end.`
+        );
+        return;
+      }
+
+      // Find the ProseMirror position for this line number
+      const insertPos = findBlockNodePosition(editor, lineNum);
+      console.log("📍 ProseMirror insert position:", insertPos);
+      console.log("📊 Document size:", doc.content.size);
+      console.log(
+        "📊 Block nodes:",
+        blockNodes.map((b, i) => `Line ${i + 1}: ${b.type} at pos ${b.pos}`)
+      );
+
+      // Validate position
+      if (insertPos < 1 || insertPos >= doc.content.size) {
+        console.warn(
+          `⚠️ Invalid position ${insertPos}, clamping to valid range`
+        );
+        const clampedPos = Math.max(
+          1,
+          Math.min(insertPos, doc.content.size - 1)
+        );
+        console.log(`📍 Using clamped position: ${clampedPos}`);
+      }
+
+      // Convert the text to HTML (each line becomes a paragraph)
+      const htmlContent = patchTestText
+        .split("\n")
+        .filter((line) => line.trim() !== "") // Remove empty lines
+        .map((line) => `<p>${line.trim()}</p>`)
+        .join("");
+
+      // If no content after filtering, use a single paragraph
+      const finalHtmlContent = htmlContent || `<p>${patchTestText.trim()}</p>`;
+
+      console.log("📝 HTML content to insert:", finalHtmlContent);
+
+      // Insert HTML content at the calculated position using TipTap
+      // This preserves the document structure and formatting
+      if (editor.commands) {
+        // Clamp position to valid range
+        const pos = Math.max(1, Math.min(insertPos, doc.content.size - 1));
+
+        console.log(
+          `🔧 Attempting to insert at position ${pos} (document size: ${doc.content.size})`
+        );
+
+        // Try to insert - TipTap's insertContentAt should handle block insertion
+        try {
+          editor.commands.insertContentAt(pos, finalHtmlContent);
+          console.log("✅ Patch test applied successfully");
+          alert(`✅ Patch applied! Text inserted at line ${lineNum}`);
+        } catch (insertError: any) {
+          console.error("❌ Insert failed:", insertError);
+          // Fallback: try inserting at a slightly different position
+          const fallbackPos = pos > 1 ? pos - 1 : pos + 1;
+          console.log(`🔄 Trying fallback position: ${fallbackPos}`);
+          try {
+            editor.commands.insertContentAt(fallbackPos, finalHtmlContent);
+            console.log("✅ Patch test applied with fallback position");
+            alert(
+              `✅ Patch applied! Text inserted at line ${lineNum} (used fallback position)`
+            );
+          } catch (fallbackError: any) {
+            console.error("❌ Fallback insert also failed:", fallbackError);
+            alert(
+              `Failed to insert: ${fallbackError.message || "Invalid position"}`
+            );
+          }
+        }
+      } else {
+        console.error("❌ Cannot apply patch: no editor commands");
+        alert("Failed to apply patch: Editor commands not available");
+      }
+
+      // Close dialog and reset
+      setShowPatchTest(false);
+      setPatchTestLineNumber("");
+      setPatchTestText("");
+    } catch (error: any) {
+      console.error("❌ Patch test failed:", error);
+      alert(`Failed to apply patch: ${error.message}`);
+    }
+  };
+
+  // Helper: Convert markdown-style text to HTML
+  const convertTextToHTML = (text: string): string => {
+    const lines = text.split("\n");
+    const htmlLines: string[] = [];
+
+    // Common heading keywords for research papers
+    const headingKeywords = [
+      "abstract",
+      "introduction",
+      "background",
+      "methodology",
+      "methods",
+      "results",
+      "discussion",
+      "conclusion",
+      "references",
+      "bibliography",
+      "acknowledgments",
+      "appendix",
+      "summary",
+    ];
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const trimmed = line.trim();
+
+      if (!trimmed) {
+        // Empty line - skip (don't add empty paragraphs between sections)
+        continue;
+      }
+
+      // Check for markdown headings (# Heading)
+      const headingMatch = trimmed.match(/^(#{1,6})\s+(.+)$/);
+      if (headingMatch) {
+        const level = headingMatch[1].length;
+        const text = headingMatch[2];
+        htmlLines.push(`<h${level}>${text}</h${level}>`);
+        continue;
+      }
+
+      // Check for heading-like text:
+      // - Short line (< 60 chars)
+      // - Title case or all caps
+      // - Followed by blank line or is a known heading keyword
+      const nextLine = i + 1 < lines.length ? lines[i + 1].trim() : "";
+      const isShort = trimmed.length < 60;
+      const isHeadingKeyword = headingKeywords.some(
+        (kw) =>
+          trimmed.toLowerCase() === kw || trimmed.toLowerCase() === kw + "s"
+      );
+      const isTitleCase = /^[A-Z][a-z]/.test(trimmed);
+      const followedByBlank = nextLine === "";
+
+      if (isShort && (isHeadingKeyword || (isTitleCase && followedByBlank))) {
+        // Treat as heading (h2 by default for sections)
+        htmlLines.push(`<h2>${trimmed}</h2>`);
+        continue;
+      }
+
+      // Check for list items
+      if (trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
+        htmlLines.push(`<li>${trimmed.substring(2)}</li>`);
+        continue;
+      }
+
+      // Check for numbered list
+      if (/^\d+\.\s+/.test(trimmed)) {
+        htmlLines.push(`<li>${trimmed.replace(/^\d+\.\s+/, "")}</li>`);
+        continue;
+      }
+
+      // Regular paragraph
+      htmlLines.push(`<p>${trimmed}</p>`);
+    }
+
+    return htmlLines.join("");
+  };
+
   // Handle accepting a patch
   const handleAcceptPatch = async (patch: Patch) => {
     console.log("🔧 Applying patch:", patch);
@@ -185,56 +582,72 @@ export function ChatPanel({
     }
 
     try {
-      // Get current content from editor
-      let currentContent = "";
-
-      // Try multiple methods to get content
-      if (typeof editor.getText === "function") {
-        currentContent = editor.getText();
-      } else if (typeof editor.getHTML === "function") {
-        // Convert HTML to text if needed
-        const html = editor.getHTML();
-        const tempDiv = document.createElement("div");
-        tempDiv.innerHTML = html;
-        currentContent = tempDiv.textContent || "";
-      } else if (editor.state?.doc) {
-        currentContent = editor.state.doc.textContent || "";
-      }
-
-      console.log("📄 Current content length:", currentContent.length);
-      console.log("📝 First 100 chars:", currentContent.substring(0, 100));
-
-      if (!currentContent) {
-        console.warn("⚠️ Editor content is empty, using empty string");
-        currentContent = "";
-      }
-
-      // Apply the patch - explicitly type patch to ensure compatibility
-      const newContent = applyPatch(currentContent, patch as Patch);
-
-      console.log("✨ New content length:", newContent.length);
-      console.log("📝 First 100 chars:", newContent.substring(0, 100));
-
-      // Update editor - use commands API for TipTap
-      if (editor.commands) {
-        // Clear and set new content
-        editor.commands.setContent(newContent);
-        console.log("✅ Patch applied via TipTap commands");
-      } else if (onReplaceInEditor) {
-        // Fallback to parent handler
-        onReplaceInEditor(newContent);
-        console.log("✅ Patch applied via replace handler");
-      } else {
-        console.error("❌ No method to update editor");
-        alert("Cannot update editor. Please try manually copying the content.");
+      // Validate patch has required fields
+      if (!patch.target || !patch.type) {
+        console.error("❌ Invalid patch format:", patch);
+        alert("Invalid patch format. Missing target or type.");
         return;
       }
 
-      // Show success message
-      console.log("✅ Patch applied successfully!");
+      const { startLine, endLine } = patch.target;
+      console.log(
+        `📍 Applying ${patch.type} patch at lines ${startLine}-${endLine}`
+      );
 
-      // Optional: Show a brief success indicator
-      // You could add a toast notification here
+      const { state } = editor.view;
+      const { doc } = state;
+
+      // For DELETE operations
+      if (patch.type === "delete") {
+        // Find the position range to delete
+        const startPos = findBlockNodePosition(editor, startLine);
+        const endPos = findBlockNodePosition(editor, endLine + 1); // +1 to delete up to and including endLine
+
+        console.log(`🗑️ Deleting from position ${startPos} to ${endPos}`);
+
+        // Delete the content
+        editor.commands.deleteRange({ from: startPos, to: endPos });
+        console.log("✅ Delete patch applied successfully");
+        return;
+      }
+
+      // For INSERT and REPLACE operations
+      if (!patch.content) {
+        console.error("❌ Patch has no content:", patch);
+        alert("Patch has no content to insert/replace.");
+        return;
+      }
+
+      // Find the insertion position
+      const insertPos = findBlockNodePosition(editor, startLine);
+      console.log(`📍 Inserting at position ${insertPos}`);
+
+      // Convert patch content to HTML (handle markdown formatting)
+      const htmlContent = convertTextToHTML(patch.content);
+      console.log("📝 HTML content to insert:", htmlContent.substring(0, 200));
+
+      // For REPLACE: delete the old content first
+      if (patch.type === "replace") {
+        const endPos = findBlockNodePosition(editor, endLine + 1);
+        console.log(`🔄 Replacing from position ${insertPos} to ${endPos}`);
+        editor.commands.deleteRange({ from: insertPos, to: endPos });
+      }
+
+      // Insert the new content at the calculated position
+      // Clamp position to valid range
+      const pos = Math.max(1, Math.min(insertPos, doc.content.size - 1));
+
+      try {
+        editor.commands.insertContentAt(pos, htmlContent);
+        console.log("✅ Patch applied successfully with formatting preserved");
+      } catch (insertError: any) {
+        console.error("❌ Insert failed:", insertError);
+        // Fallback: try inserting at a slightly different position
+        const fallbackPos = pos > 1 ? pos - 1 : pos + 1;
+        console.log(`🔄 Trying fallback position: ${fallbackPos}`);
+        editor.commands.insertContentAt(fallbackPos, htmlContent);
+        console.log("✅ Patch applied with fallback position");
+      }
     } catch (error) {
       console.error("❌ Error applying patch:", error);
       alert(
@@ -262,30 +675,20 @@ export function ChatPanel({
     }
 
     try {
-      // Get current content from editor
-      let currentContent = "";
+      // Apply patches one by one using the same logic as handleAcceptPatch
+      for (let i = 0; i < patches.length; i++) {
+        const patch = patches[i];
+        console.log(`📍 Applying patch ${i + 1}/${patches.length}:`, patch);
 
-      if (typeof editor.getText === "function") {
-        currentContent = editor.getText();
-      } else if (editor.state?.doc) {
-        currentContent = editor.state.doc.textContent || "";
+        try {
+          await handleAcceptPatch(patch);
+        } catch (error) {
+          console.error(`❌ Failed to apply patch ${i + 1}:`, error);
+          // Continue with next patch even if one fails
+        }
       }
 
-      console.log("📄 Current content length:", currentContent.length);
-
-      // Apply all patches in sequence
-      const newContent = applyPatches(currentContent, patches);
-
-      console.log("✨ New content length:", newContent.length);
-
-      // Update editor
-      if (editor.commands) {
-        editor.commands.setContent(newContent);
-        console.log(`✅ Applied ${patches.length} patches via TipTap commands`);
-      } else if (onReplaceInEditor) {
-        onReplaceInEditor(newContent);
-        console.log(`✅ Applied ${patches.length} patches via replace handler`);
-      }
+      console.log(`✅ Applied ${patches.length} patches successfully`);
     } catch (error) {
       console.error("❌ Error applying patches:", error);
       alert(
@@ -356,10 +759,22 @@ export function ChatPanel({
       }
 
       // Parse response for patches after streaming completes
+      console.log("[ChatPanel] Parsing AI response for patches...", {
+        responseLength: fullResponse.length,
+        responsePreview: fullResponse.substring(0, 200),
+      });
+
       const { hasPatches, patches, textContent } = parseAIResponse(
         fullResponse,
         currentFileName || undefined
       );
+
+      console.log("[ChatPanel] Parsed AI response:", {
+        hasPatches,
+        patchCount: patches.length,
+        patches: patches,
+        textContentPreview: textContent.substring(0, 100),
+      });
 
       // Update message with parsed patches
       setMessages((prev) =>
@@ -456,6 +871,308 @@ export function ChatPanel({
 
       {/* Input Area */}
       <div className="border-t border-[var(--border-primary)] p-4 shrink-0 bg-[var(--bg-secondary)]">
+        {/* Patch Test and View Lines Buttons */}
+        <div className="flex gap-2 mb-2">
+          <button
+            onClick={() => setShowPatchTest(true)}
+            className="text-[11px] px-2 py-1 bg-purple-600 hover:bg-purple-700 border border-purple-500 rounded text-white transition-all duration-150 flex items-center gap-1.5"
+            title="Test patch insertion"
+          >
+            <span>🧪 Patch Test</span>
+          </button>
+          <button
+            onClick={() => setShowLineViewer(true)}
+            className="text-[11px] px-2 py-1 bg-blue-600 hover:bg-blue-700 border border-blue-500 rounded text-white transition-all duration-150 flex items-center gap-1.5"
+            title="View document lines as JSON"
+          >
+            <span>📋 View Lines</span>
+          </button>
+        </div>
+
+        {/* Patch Test Dialog */}
+        {showPatchTest && (
+          <div
+            className="flex fixed inset-0 z-50 justify-center items-center bg-black bg-opacity-50"
+            onClick={() => setShowPatchTest(false)}
+          >
+            <div
+              className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg p-6 max-w-md w-full mx-4 shadow-xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className="text-lg font-semibold mb-4 text-[var(--text-primary)]">
+                🧪 Patch Test
+              </h3>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-[var(--text-primary)]">
+                    Line Number (to insert at):
+                  </label>
+                  <input
+                    type="number"
+                    value={patchTestLineNumber}
+                    onChange={(e) => setPatchTestLineNumber(e.target.value)}
+                    placeholder="e.g., 5"
+                    min="1"
+                    className="w-full px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
+                    autoFocus
+                  />
+                  <p className="text-xs text-[var(--text-tertiary)] mt-1">
+                    Current document has {countBlockNodes(editor || null)} block
+                    nodes (visual lines)
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-[var(--text-primary)]">
+                    Text to Insert:
+                  </label>
+                  <textarea
+                    value={patchTestText}
+                    onChange={(e) => setPatchTestText(e.target.value)}
+                    placeholder="Enter text to insert at the specified line..."
+                    rows={4}
+                    className="w-full px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] resize-none"
+                  />
+                </div>
+
+                <div className="flex gap-2 justify-end">
+                  <button
+                    onClick={() => {
+                      setShowPatchTest(false);
+                      setPatchTestLineNumber("");
+                      setPatchTestText("");
+                    }}
+                    className="px-4 py-2 bg-[var(--bg-primary)] hover:bg-[var(--bg-hover)] border border-[var(--border-primary)] rounded text-[var(--text-primary)] transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handlePatchTest}
+                    className="px-4 py-2 text-white bg-purple-600 rounded transition-colors hover:bg-purple-700"
+                  >
+                    Apply Patch
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* View Lines Dialog */}
+        {showLineViewer && (
+          <div
+            className="flex fixed inset-0 z-50 justify-center items-center bg-black bg-opacity-50"
+            onClick={() => setShowLineViewer(false)}
+          >
+            <div
+              className="bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg p-6 max-w-6xl w-full mx-4 shadow-xl max-h-[90vh] flex flex-col"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex justify-between items-center mb-4">
+                <div>
+                  <h3 className="text-lg font-semibold text-[var(--text-primary)]">
+                    📋 Document Structure (Block Nodes)
+                  </h3>
+                  <p className="text-xs text-[var(--text-tertiary)] mt-1">
+                    ⚠️ Line numbers = block nodes (not visual wrapped lines)
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowLineViewer(false)}
+                  className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+                >
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 20 20"
+                    fill="none"
+                    className="w-5 h-5"
+                  >
+                    <path
+                      d="M15 5L5 15M5 5L15 15"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Tabs for Table vs JSON view */}
+              <div className="flex gap-2 mb-3 border-b border-[var(--border-primary)]">
+                <button
+                  onClick={() => {
+                    const tab = document.getElementById("lines-table-view");
+                    const jsonTab = document.getElementById("lines-json-view");
+                    if (tab && jsonTab) {
+                      tab.style.display = "block";
+                      jsonTab.style.display = "none";
+                    }
+                  }}
+                  className="px-3 py-1.5 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-hover)] rounded-t transition-colors"
+                >
+                  📊 Table
+                </button>
+                <button
+                  onClick={() => {
+                    const tab = document.getElementById("lines-table-view");
+                    const jsonTab = document.getElementById("lines-json-view");
+                    if (tab && jsonTab) {
+                      tab.style.display = "none";
+                      jsonTab.style.display = "block";
+                    }
+                  }}
+                  className="px-3 py-1.5 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-hover)] rounded-t transition-colors"
+                >
+                  📋 JSON
+                </button>
+              </div>
+
+              {/* Table View */}
+              <div id="lines-table-view" className="overflow-auto flex-1 mb-4">
+                <table className="w-full text-xs border-collapse">
+                  <thead className="sticky top-0 bg-[var(--bg-tertiary)] border-b border-[var(--border-primary)]">
+                    <tr>
+                      <th className="text-left p-2 font-semibold text-[var(--text-primary)]">
+                        Line#
+                      </th>
+                      <th className="text-left p-2 font-semibold text-[var(--text-primary)]">
+                        Type
+                      </th>
+                      <th className="text-left p-2 font-semibold text-[var(--text-primary)]">
+                        Status
+                      </th>
+                      <th className="text-left p-2 font-semibold text-[var(--text-primary)]">
+                        Chars
+                      </th>
+                      <th className="text-left p-2 font-semibold text-[var(--text-primary)]">
+                        Est. Visual
+                      </th>
+                      <th className="text-left p-2 font-semibold text-[var(--text-primary)]">
+                        Position
+                      </th>
+                      <th className="text-left p-2 font-semibold text-[var(--text-primary)]">
+                        Preview
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(() => {
+                      if (!editor) return null;
+                      const { state } = editor.view;
+                      const { doc } = state;
+                      const rows: React.ReactElement[] = [];
+                      let lineNum = 1;
+
+                      doc.descendants((node, pos) => {
+                        if (
+                          node.isBlock &&
+                          (node.type.name === "paragraph" ||
+                            node.type.name.startsWith("heading") ||
+                            node.type.name === "codeBlock" ||
+                            node.type.name === "blockquote")
+                        ) {
+                          const text = node.textContent || "";
+                          const isEmpty = text.trim() === "";
+                          const charCount = text.length;
+                          const estVisual =
+                            charCount === 0
+                              ? 1
+                              : Math.max(1, Math.ceil(charCount / 80));
+                          const preview = isEmpty
+                            ? "[EMPTY]"
+                            : text.substring(0, 60) +
+                              (text.length > 60 ? "..." : "");
+
+                          rows.push(
+                            <tr
+                              key={lineNum}
+                              className="border-b border-[var(--border-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+                            >
+                              <td className="p-2 font-mono font-semibold text-[var(--accent-primary)]">
+                                {lineNum}
+                              </td>
+                              <td className="p-2 text-[var(--text-secondary)]">
+                                <code className="text-xs bg-[var(--bg-primary)] px-1 py-0.5 rounded">
+                                  {node.type.name}
+                                </code>
+                              </td>
+                              <td className="p-2">
+                                {isEmpty ? (
+                                  <span className="text-orange-400">
+                                    ⚠️ Empty
+                                  </span>
+                                ) : estVisual > 10 ? (
+                                  <span className="text-yellow-400">
+                                    ⚠️ Long
+                                  </span>
+                                ) : (
+                                  <span className="text-green-400">
+                                    ✓ Normal
+                                  </span>
+                                )}
+                              </td>
+                              <td className="p-2 text-[var(--text-secondary)] font-mono">
+                                {charCount}
+                              </td>
+                              <td className="p-2 text-[var(--text-secondary)] font-mono">
+                                ~{estVisual} lines
+                              </td>
+                              <td className="p-2 text-[var(--text-tertiary)] font-mono text-[10px]">
+                                {pos}-{pos + node.nodeSize}
+                              </td>
+                              <td className="p-2 text-[var(--text-secondary)] max-w-md truncate">
+                                <span className={isEmpty ? "italic" : ""}>
+                                  {preview}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                          lineNum++;
+                        }
+                        return true;
+                      });
+
+                      return rows;
+                    })()}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* JSON View */}
+              <div
+                id="lines-json-view"
+                className="overflow-auto flex-1 mb-4"
+                style={{ display: "none" }}
+              >
+                <pre className="bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded p-4 text-xs text-[var(--text-primary)] overflow-auto font-mono whitespace-pre-wrap break-words">
+                  {generateLineWiseJSON()}
+                </pre>
+              </div>
+
+              <div className="flex gap-2 justify-end">
+                <button
+                  onClick={() => {
+                    const json = generateLineWiseJSON();
+                    navigator.clipboard.writeText(json);
+                    alert("✅ JSON copied to clipboard!");
+                  }}
+                  className="px-4 py-2 text-white bg-blue-600 rounded transition-colors hover:bg-blue-700"
+                >
+                  📋 Copy JSON
+                </button>
+                <button
+                  onClick={() => setShowLineViewer(false)}
+                  className="px-4 py-2 bg-[var(--bg-primary)] hover:bg-[var(--bg-hover)] border border-[var(--border-primary)] rounded text-[var(--text-primary)] transition-colors"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Model Selector - Cursor style, above input */}
         <div className="relative mb-2">
           <button

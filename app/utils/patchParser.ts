@@ -26,6 +26,8 @@ export function parseAIResponse(response: string, fileName?: string): {
     if (jsonBlockMatch) {
       try {
         const parsed = JSON.parse(jsonBlockMatch[1]);
+        
+        // Check if it's an object with patches property
         if (parsed.patches && Array.isArray(parsed.patches)) {
           // Extract explanation (text before the JSON block)
           const explanation = response.substring(0, jsonBlockMatch.index).trim();
@@ -41,7 +43,29 @@ export function parseAIResponse(response: string, fileName?: string): {
           return {
             hasPatches: patches.length > 0,
             patches,
-            textContent: explanation || response,
+            textContent: explanation || parsed.explanation || response,
+          };
+        }
+        
+        // Check if it's a direct array of patches
+        if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].type) {
+          // Extract explanation (text before the JSON block)
+          const explanation = response.substring(0, jsonBlockMatch.index).trim();
+          
+          // Convert backend patch format to frontend Patch format
+          const patches: Patch[] = parsed.map((p: any) => ({
+            type: p.type || 'replace',
+            target: p.target || { startLine: 1, endLine: 1 },
+            content: p.content || '',
+            file: fileName || '',
+          }));
+
+          console.log('[parseAIResponse] Found patches array directly:', patches);
+          
+          return {
+            hasPatches: patches.length > 0,
+            patches,
+            textContent: explanation || 'Document edits completed',
           };
         }
       } catch (e) {

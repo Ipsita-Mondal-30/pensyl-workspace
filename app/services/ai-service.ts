@@ -92,19 +92,27 @@ async function* streamMessageViaBackend(
     : options.context;
 
   // Check if this is a document editing request
-  const useOrchestration = isDocumentEditRequest(lastMessage.content, context || options.context);
+  // The document context is in lastMessage.content (formatted with line numbers by useAIChat)
+  // So we check the full message content for document editing indicators
+  // Pass the same content as both message and context since it contains everything
+  const useOrchestration = isDocumentEditRequest(lastMessage.content, lastMessage.content);
   
   console.log('[AIService] Document edit detection:', {
     userMessage: lastMessage.content.substring(0, 100),
     hasContext: !!(context || options.context),
     contextPreview: (context || options.context || '').substring(0, 200),
+    fullMessagePreview: lastMessage.content.substring(0, 300),
     useOrchestration,
+    messageLength: lastMessage.content.length,
+    hasLineNumbers: /\d+:\s/.test(lastMessage.content.toLowerCase()),
+    hasCurrentFile: lastMessage.content.toLowerCase().includes('current file:'),
+    editKeywordsFound: ['add', 'conclusion', 'insert'].filter(kw => lastMessage.content.toLowerCase().includes(kw)),
   });
 
   try {
     if (useOrchestration) {
       // Use orchestration endpoint for document editing
-      console.log('[AIService] ✅ Using orchestration for document editing request');
+      console.log('[AIService] ✅ ORCHESTRATION WILL BE USED for document editing');
       console.log('[AIService] Sending to orchestration:', {
         prompt: lastMessage.content,
         contextLength: (context || options.context || '').length,
@@ -142,6 +150,7 @@ async function* streamMessageViaBackend(
       console.log('✅ Backend Orchestration Response completed');
     } else {
       // Use direct execute API for regular requests
+      console.log('[AIService] ⚠️ USING DIRECT EXECUTE (orchestration NOT triggered - patches will NOT be generated)');
       yield* streamAI(
         {
           task: 'generate',
