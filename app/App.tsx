@@ -20,6 +20,7 @@ import {
   MathEditor,
   CitationDialog,
   TableInsertDialog,
+  ProjectsScreen,
   type CursorPosition,
   type Command,
   type ViewMode,
@@ -28,6 +29,8 @@ import {
 import { LoginPage } from "./components/auth/LoginPage";
 import { OnboardingPage } from "./components/onboarding/OnboardingPage";
 import { useAuth } from "./hooks/useAuth";
+import { useAutoSave } from "./hooks/useAutoSave";
+import { projectsClient } from "./lib/projects-client";
 import type { FileItem } from "./shared/types";
 import TurndownService from "turndown";
 import { marked } from "marked";
@@ -46,15 +49,26 @@ import { researchPaperTemplate1 } from "./lib/templates/research-paper-template-
 
 function App() {
   // Auth state
-  const { user, loading: authLoading, refreshSession } = useAuth();
-  const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState<boolean | null>(null);
+  const { user, loading: authLoading, refreshSession, signOut } = useAuth();
+  const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState<
+    boolean | null
+  >(null);
+
+  // Project workspace state
+  const [showProjectsScreen, setShowProjectsScreen] = useState(true);
+  const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
+  const [currentProjectJson, setCurrentProjectJson] = useState<any>(null);
+  const [isLoadingProject, setIsLoadingProject] = useState(false);
+  const [isProjectHydrating, setIsProjectHydrating] = useState(false);
 
   // Check onboarding status when user is available
   useEffect(() => {
     if (user && hasCompletedOnboarding === null) {
       // User is logged in - check onboarding status
-      const onboardingStatus = localStorage.getItem(`onboarding_completed_${user.id}`);
-      setHasCompletedOnboarding(onboardingStatus === 'true');
+      const onboardingStatus = localStorage.getItem(
+        `onboarding_completed_${user.id}`
+      );
+      setHasCompletedOnboarding(onboardingStatus === "true");
     }
   }, [user, hasCompletedOnboarding]);
 
@@ -62,7 +76,7 @@ function App() {
   useEffect(() => {
     // Check if we're coming back from OAuth callback
     const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.has('code') || urlParams.has('state')) {
+    if (urlParams.has("code") || urlParams.has("state")) {
       // OAuth callback - refresh session after a short delay
       setTimeout(() => {
         refreshSession();
@@ -148,7 +162,7 @@ function App() {
   useEffect(() => {
     const initialize = async () => {
       setFileSystemReady(true);
-      // Auto-open root folder
+      // Auto-open root folder (legacy). For project mode we keep sections only.
       await handleOpenFolder();
 
       // Ensure main file exists
@@ -173,6 +187,96 @@ function App() {
     initialize();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // When user logs in and no project is open, show projects screen by default
+  useEffect(() => {
+    if (user && !currentProjectId) {
+      setShowProjectsScreen(true);
+      setTabs([]);
+      setActiveTabId(null);
+      setSections([]);
+    }
+    if (!user) {
+      setShowProjectsScreen(false);
+    }
+  }, [user, currentProjectId]);
+
+  // When a project loads, set content once (avoid resetting cursor while typing)
+  const lastAppliedProject = useRef<{
+    projectId: string | null;
+    contentHash: string | null;
+  }>({
+    projectId: null,
+    contentHash: null,
+  });
+
+  const editorReady = !!editorRef.current;
+
+  useEffect(() => {
+    if (!currentProjectId || !currentProjectJson || !editorRef.current) return;
+    const activeProjectTab = tabs.find(
+      (t) => t.id === activeTabId && t.filePath?.startsWith("project://")
+    );
+    if (!activeProjectTab) return;
+
+    // Support stringified JSON from API
+    const jsonContent =
+      typeof currentProjectJson === "string"
+        ? JSON.parse(currentProjectJson)
+        : currentProjectJson;
+
+    const contentHash = JSON.stringify(jsonContent);
+    const alreadyApplied =
+      lastAppliedProject.current.projectId === currentProjectId &&
+      lastAppliedProject.current.contentHash === contentHash;
+
+    // If editor/tab is empty, allow re-apply even if hash matches
+    const tabHasContent =
+      !!activeProjectTab.content &&
+      activeProjectTab.content.trim() !== "<p></p>";
+
+    if (alreadyApplied && tabHasContent) {
+      // Even if already applied, ensure hydration flag is cleared
+      if (isProjectHydrating) setIsProjectHydrating(false);
+      return;
+    }
+
+    try {
+      editorRef.current.commands.setContent(jsonContent);
+      lastAppliedProject.current = { projectId: currentProjectId, contentHash };
+
+      const html = editorRef.current.getHTML();
+      setTabs((prev) =>
+        prev.map((t) =>
+          t.id === activeProjectTab.id
+            ? { ...t, content: html, isModified: false }
+            : t
+        )
+      );
+      const parsedSections = parseSectionsFromHTML(html);
+      setSections(parsedSections);
+      if (isProjectHydrating) setIsProjectHydrating(false);
+    } catch (error) {
+      console.error("Failed to sync project content into editor:", error);
+      if (isProjectHydrating) setIsProjectHydrating(false);
+    }
+  }, [
+    currentProjectId,
+    currentProjectJson,
+    activeTabId,
+    tabs,
+    editorReady,
+    isProjectHydrating,
+  ]);
+
+  // Fallback to clear hydration state after short delay in case effect didn’t run
+  useEffect(() => {
+    if (!isProjectHydrating) return;
+    const timer = setTimeout(() => {
+      setIsProjectHydrating(false);
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [isProjectHydrating]);
+
   // Load folder structure
   const loadFolder = useCallback(async (folderPath: string) => {
     try {
@@ -182,6 +286,41 @@ function App() {
     } catch (error) {
       console.error("Error loading folder:", error);
       alert(`Failed to load folder: ${error}`);
+    }
+  }, []);
+
+  // Project loading
+  const openProjectById = useCallback(async (projectId: string) => {
+    setIsLoadingProject(true);
+    setIsProjectHydrating(true);
+    try {
+      const project = await projectsClient.getProject(projectId);
+      const jsonContent = project.content || {
+        type: "doc",
+        content: [{ type: "paragraph" }],
+      };
+      setCurrentProjectId(project.id);
+      setCurrentProjectJson(jsonContent);
+      setShowProjectsScreen(false);
+
+      // Seed a project tab (will be updated once editor mounts)
+      // Start with empty tab content so rehydration can apply saved JSON
+      const projectTab: TabData = {
+        id: `project-${project.id}`,
+        filePath: `project://${project.id}`,
+        fileName: project.name,
+        isModified: false,
+        content: "",
+      };
+      setTabs([projectTab]);
+      setActiveTabId(projectTab.id);
+      setSections([]);
+    } catch (error: any) {
+      console.error("Failed to open project:", error);
+      alert(error?.message || "Failed to open project");
+    } finally {
+      setIsLoadingProject(false);
+      setIsProjectHydrating(false);
     }
   }, []);
 
@@ -252,6 +391,22 @@ function App() {
     },
     [currentFolder, loadFolder]
   );
+
+  // Logout handler: clear project/workspace state then sign out
+  const handleLogout = useCallback(async () => {
+    setShowProjectsScreen(false);
+    setCurrentProjectId(null);
+    setCurrentProjectJson(null);
+    setTabs([]);
+    setActiveTabId(null);
+    setSections([]);
+    setSelectedSectionId(undefined);
+    try {
+      await signOut();
+    } catch (error) {
+      console.error("Failed to logout:", error);
+    }
+  }, [signOut]);
 
   // Handle rename
   const handleRename = useCallback(
@@ -416,6 +571,16 @@ function App() {
     []
   );
 
+  // Project auto-save every 5 seconds when in project mode
+  useAutoSave({
+    projectId: currentProjectId,
+    content: currentProjectJson,
+    enabled: !!currentProjectId,
+    interval: 5000,
+    onSaveSuccess: () => setLastSaved(new Date()),
+    onSaveError: (error) => console.error("Project auto-save failed:", error),
+  });
+
   // Handle editor content change with auto-save (defined before handleNewSection)
   const handleEditorChange = useCallback(
     (tabId: string, content: string) => {
@@ -427,6 +592,25 @@ function App() {
           t.id === tabId ? { ...t, content, isModified: true } : t
         )
       );
+
+      // Project mode: capture TipTap JSON and let project auto-save handle persistence
+      if (tab.filePath?.startsWith("project://") && editorRef.current) {
+        try {
+          const jsonContent = editorRef.current.getJSON();
+          setCurrentProjectJson(jsonContent);
+        } catch (error) {
+          console.error("Error converting editor state to JSON:", error);
+        }
+        // Update sections for project mode as well
+        try {
+          const parsedSections = parseSectionsFromHTML(content);
+          setSections(parsedSections);
+        } catch (error) {
+          console.error("Error parsing sections:", error);
+          setSections([]);
+        }
+        return; // Skip local filesystem auto-save
+      }
 
       // Update sections when content changes
       if (tab.filePath === MAIN_FILE_PATH) {
@@ -1132,41 +1316,47 @@ function App() {
   // Show onboarding if user hasn't completed it
   // If hasCompletedOnboarding is null, we're still checking, so show onboarding as default
   if (hasCompletedOnboarding !== true) {
-    const handleOnboardingComplete = (projectType: 'research-paper' | 'other', template?: string) => {
+    const handleOnboardingComplete = (
+      projectType: "research-paper" | "other",
+      template?: string
+    ) => {
       // Mark onboarding as completed
-      localStorage.setItem(`onboarding_completed_${user.id}`, 'true');
+      localStorage.setItem(`onboarding_completed_${user.id}`, "true");
       setHasCompletedOnboarding(true);
 
       // If research paper template selected, load it
-      if (projectType === 'research-paper' && template === 'template-1') {
+      if (projectType === "research-paper" && template === "template-1") {
         // Load template into the editor
         setTimeout(() => {
           const templateContent = researchPaperTemplate1;
           // Create the research paper file with template content
-          localStorageFS.writeFile(MAIN_FILE_PATH, templateContent).then(() => {
-            // Create a new tab with the template
-            const newTab: TabData = {
-              id: `tab-${Date.now()}`,
-              filePath: MAIN_FILE_PATH,
-              fileName: "research-paper.md",
-              isModified: false,
-              content: templateContent,
-            };
-            setTabs([newTab]);
-            setActiveTabId(newTab.id);
-          }).catch((error) => {
-            console.error('Failed to write template file:', error);
-            // Still create the tab even if write fails
-            const newTab: TabData = {
-              id: `tab-${Date.now()}`,
-              filePath: MAIN_FILE_PATH,
-              fileName: "research-paper.md",
-              isModified: false,
-              content: templateContent,
-            };
-            setTabs([newTab]);
-            setActiveTabId(newTab.id);
-          });
+          localStorageFS
+            .writeFile(MAIN_FILE_PATH, templateContent)
+            .then(() => {
+              // Create a new tab with the template
+              const newTab: TabData = {
+                id: `tab-${Date.now()}`,
+                filePath: MAIN_FILE_PATH,
+                fileName: "research-paper.md",
+                isModified: false,
+                content: templateContent,
+              };
+              setTabs([newTab]);
+              setActiveTabId(newTab.id);
+            })
+            .catch((error) => {
+              console.error("Failed to write template file:", error);
+              // Still create the tab even if write fails
+              const newTab: TabData = {
+                id: `tab-${Date.now()}`,
+                filePath: MAIN_FILE_PATH,
+                fileName: "research-paper.md",
+                isModified: false,
+                content: templateContent,
+              };
+              setTabs([newTab]);
+              setActiveTabId(newTab.id);
+            });
         }, 100);
       }
     };
@@ -1174,11 +1364,42 @@ function App() {
     return <OnboardingPage onComplete={handleOnboardingComplete} />;
   }
 
+  // Projects gate: show project chooser/creator before entering workspace
+  if (user && showProjectsScreen && !currentProjectId) {
+    return (
+      <div className="w-full h-screen flex flex-col bg-[var(--bg-primary)] text-[var(--text-primary)] overflow-hidden">
+        <TopBar
+          onOpenSettings={() => setIsSettingsOpen(true)}
+          onOpenAI={() => setIsChatCollapsed(false)}
+          onOpenProjects={() => setShowProjectsScreen(true)}
+          onExport={handleExport}
+          onInsert={handleInsert}
+          onFormat={handleFormat}
+          onViewModeChange={setViewMode}
+          currentViewMode={viewMode}
+          onToggleToC={() => setShowToC(!showToC)}
+          showToC={showToC}
+          onAddSource={(type) => console.log("Add source:", type)}
+          onCite={() => setShowCitationDialog(true)}
+        />
+        <div className="overflow-hidden flex-1">
+          <ProjectsScreen onOpenProject={openProjectById} />
+        </div>
+        <SettingsModal
+          isOpen={isSettingsOpen}
+          onClose={() => setIsSettingsOpen(false)}
+          onLogout={handleLogout}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="w-full h-screen flex flex-col bg-[var(--bg-primary)] text-[var(--text-primary)] overflow-hidden">
       <TopBar
         onOpenSettings={() => setIsSettingsOpen(true)}
         onOpenAI={() => setIsChatCollapsed(false)}
+        onOpenProjects={() => setShowProjectsScreen(true)}
         onExport={handleExport}
         onInsert={handleInsert}
         onFormat={handleFormat}
@@ -1195,12 +1416,15 @@ function App() {
           let searchQuery = "";
           if (editorRef.current) {
             const { from, to } = editorRef.current.state.selection;
-            const selectedText = editorRef.current.state.doc.textBetween(from, to);
+            const selectedText = editorRef.current.state.doc.textBetween(
+              from,
+              to
+            );
             if (selectedText.trim()) {
               searchQuery = selectedText.trim();
             }
           }
-          
+
           // If no selection, get text around cursor (last sentence or paragraph)
           if (!searchQuery && editorRef.current) {
             const { $from } = editorRef.current.state.selection;
@@ -1211,80 +1435,94 @@ function App() {
               searchQuery = text.slice(Math.max(0, text.length - 100));
             }
           }
-          
+
           setShowCitationDialog(true);
           // Pass search query will be handled by CitationDialog's initialSearchQuery prop
         }}
       />
       <div className="flex overflow-hidden flex-1">
-        <Sidebar
-          currentFolder={currentFolder}
-          files={files}
-          sections={sections}
-          selectedSectionId={selectedSectionId}
-          onSectionSelect={handleSectionSelect}
-          onOpenFolder={handleOpenFolder}
-          onNewSection={handleNewSection}
-          onRename={handleRename}
-          onDelete={handleDelete}
-          // Legacy props
-          selectedFileId={selectedFileId}
-          onFileSelect={handleFileSelect}
-          onNewFile={handleNewFile}
-          onNewFolder={handleNewFolder}
-        />
-        <div className="flex overflow-hidden flex-col flex-1">
-          <TabStrip
-            tabs={tabs}
-            activeTabId={activeTabId}
-            onTabSelect={handleTabSelect}
-            onTabClose={handleTabClose}
-            onTabCloseOthers={handleTabCloseOthers}
-            onTabCloseAll={handleTabCloseAll}
-            onTabRevealInExplorer={handleTabRevealInExplorer}
-            onTabRename={handleTabRename}
-          />
-
-          <div className="flex-1 flex flex-col overflow-hidden bg-[var(--bg-primary)]">
-            {activeTabId ? (
-              (() => {
-                const activeTab = tabs.find((t) => t.id === activeTabId);
-                return activeTab ? (
-                  <>
-                    <Editor
-                      ref={editorRef}
-                      content={activeTab.content || ""}
-                      onChange={(content) =>
-                        handleEditorChange(activeTab.id, content)
-                      }
-                      onUpdate={(isModified) =>
-                        handleEditorUpdate(activeTab.id, isModified)
-                      }
-                      onCursorChange={(line, column) => {
-                        setCursorPosition({ line, column });
-                      }}
-                      editable={true}
-                      viewMode={viewMode}
-                    />
-                  </>
-                ) : null;
-              })()
-            ) : (
-              <div className="flex flex-col flex-1 gap-4 justify-center items-center p-8">
-                <h1 className="text-xl font-semibold text-[var(--text-white)]">
-                  Pensyl
-                </h1>
-                <p className="text-md text-[var(--text-secondary)]">
-                  Desktop Writing IDE
-                </p>
-                <p className="text-sm text-[var(--text-tertiary)] mt-4">
-                  Click a file in the sidebar to open it
-                </p>
-              </div>
-            )}
+        {showProjectsScreen ? (
+          <div className="flex-1">
+            <ProjectsScreen onOpenProject={openProjectById} />
           </div>
-        </div>
+        ) : (
+          <>
+            <Sidebar
+              currentFolder={currentFolder}
+              files={currentProjectId ? [] : files}
+              sections={sections}
+              selectedSectionId={selectedSectionId}
+              onSectionSelect={handleSectionSelect}
+              onOpenFolder={currentProjectId ? undefined : handleOpenFolder}
+              onNewSection={handleNewSection}
+              onRename={currentProjectId ? undefined : handleRename}
+              onDelete={currentProjectId ? undefined : handleDelete}
+              // Legacy props disabled in project mode
+              selectedFileId={currentProjectId ? undefined : selectedFileId}
+              onFileSelect={currentProjectId ? undefined : handleFileSelect}
+              onNewFile={currentProjectId ? undefined : handleNewFile}
+              onNewFolder={currentProjectId ? undefined : handleNewFolder}
+            />
+            <div className="flex overflow-hidden flex-col flex-1">
+              <TabStrip
+                tabs={tabs}
+                activeTabId={activeTabId}
+                onTabSelect={handleTabSelect}
+                onTabClose={handleTabClose}
+                onTabCloseOthers={handleTabCloseOthers}
+                onTabCloseAll={handleTabCloseAll}
+                onTabRevealInExplorer={handleTabRevealInExplorer}
+                onTabRename={handleTabRename}
+              />
 
+              <div className="flex-1 flex flex-col overflow-hidden bg-[var(--bg-primary)] relative">
+                {(isLoadingProject || isProjectHydrating) &&
+                  currentProjectId && (
+                    <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-[var(--bg-primary)]/80 backdrop-blur-sm text-[var(--text-primary)]">
+                      <div className="animate-spin h-8 w-8 border-2 border-[var(--text-secondary)] border-t-transparent rounded-full mb-3" />
+                      <p className="text-sm">Loading project…</p>
+                    </div>
+                  )}
+                {activeTabId ? (
+                  (() => {
+                    const activeTab = tabs.find((t) => t.id === activeTabId);
+                    return activeTab ? (
+                      <>
+                        <Editor
+                          ref={editorRef}
+                          content={activeTab.content || ""}
+                          onChange={(content) =>
+                            handleEditorChange(activeTab.id, content)
+                          }
+                          onUpdate={(isModified) =>
+                            handleEditorUpdate(activeTab.id, isModified)
+                          }
+                          onCursorChange={(line, column) => {
+                            setCursorPosition({ line, column });
+                          }}
+                          editable={!isLoadingProject && !isProjectHydrating}
+                          viewMode={viewMode}
+                        />
+                      </>
+                    ) : null;
+                  })()
+                ) : (
+                  <div className="flex flex-col flex-1 gap-4 justify-center items-center p-8">
+                    <h1 className="text-xl font-semibold text-[var(--text-white)]">
+                      Pensyl
+                    </h1>
+                    <p className="text-md text-[var(--text-secondary)]">
+                      Desktop Writing IDE
+                    </p>
+                    <p className="text-sm text-[var(--text-tertiary)] mt-4">
+                      Click a file in the sidebar to open it
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </>
+        )}
         <ChatPanel
           isCollapsed={isChatCollapsed}
           onToggleCollapse={() => setIsChatCollapsed(!isChatCollapsed)}
@@ -1330,6 +1568,7 @@ function App() {
       <SettingsModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
+        onLogout={handleLogout}
       />
 
       <InputDialog
@@ -1362,7 +1601,7 @@ function App() {
       {/* Analytics Panel (can be toggled via command palette or button) */}
       {showAnalytics && analytics && (
         <div className="fixed bottom-4 left-4 w-96 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg shadow-xl p-4 z-50 max-h-[80vh] overflow-y-auto">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex justify-between items-center mb-4">
             <h3 className="text-lg font-semibold text-[var(--text-primary)]">
               Document Analytics
             </h3>
@@ -1413,10 +1652,12 @@ function App() {
         onInsert={handleInsertCitation}
         initialSearchQuery={
           editorRef.current?.state.selection
-            ? editorRef.current.state.doc.textBetween(
-                editorRef.current.state.selection.from,
-                editorRef.current.state.selection.to
-              ).trim() || undefined
+            ? editorRef.current.state.doc
+                .textBetween(
+                  editorRef.current.state.selection.from,
+                  editorRef.current.state.selection.to
+                )
+                .trim() || undefined
             : undefined
         }
       />

@@ -8,6 +8,7 @@ export type Theme = "dark" | "light" | "grey";
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onLogout?: () => void;
 }
 
 interface KeyboardShortcut {
@@ -31,7 +32,7 @@ const shortcuts: KeyboardShortcut[] = [
 /**
  * SettingsModal - Settings modal with theme selection and keyboard shortcuts
  */
-export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
+export function SettingsModal({ isOpen, onClose, onLogout }: SettingsModalProps) {
   const [theme, setTheme] = useState<Theme>("dark");
   const [activeTab, setActiveTab] = useState<"general" | "shortcuts">("general");
 
@@ -267,7 +268,13 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-[var(--border-primary)] flex items-center justify-end shrink-0">
+        <div className="px-6 py-4 border-t border-[var(--border-primary)] flex items-center justify-between shrink-0">
+          <button
+            onClick={onLogout}
+            className="px-4 py-2 border border-red-500 text-red-500 rounded text-sm font-medium transition-colors hover:bg-red-500/10"
+          >
+            Log out
+          </button>
           <button
             onClick={onClose}
             className="px-4 py-2 bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white rounded text-sm font-medium transition-colors"

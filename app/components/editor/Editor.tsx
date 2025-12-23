@@ -22,6 +22,7 @@ import { Focus } from "@tiptap/extension-focus";
 import { Dropcursor } from "@tiptap/extension-dropcursor";
 import { Gapcursor } from "@tiptap/extension-gapcursor";
 import { createLowlight } from "lowlight";
+import { uploadImageToWorkspaceBucket } from "../../lib/supabase-client";
 // Research paper extensions
 import { PaperNode } from "../../extensions/research-paper/PaperNode";
 import { FrontMatterNode } from "../../extensions/research-paper/FrontMatterNode";
@@ -240,7 +241,7 @@ export const Editor = forwardRef<any, EditorProps>(function Editor(
         class: "prose prose-invert max-w-none focus:outline-none px-4 py-3",
       },
       handlePaste: (view, event) => {
-        // Handle image paste from clipboard
+        // Handle image paste from clipboard and upload to Supabase storage
         const items = Array.from(event.clipboardData?.items || []);
         const imageItem = items.find(
           (item) => item.type.indexOf("image") !== -1
@@ -250,36 +251,35 @@ export const Editor = forwardRef<any, EditorProps>(function Editor(
           event.preventDefault();
           const file = imageItem.getAsFile();
           if (file) {
-            const reader = new FileReader();
-            reader.onload = (readerEvent) => {
-              const base64 = readerEvent.target?.result as string;
-              if (base64) {
-                // Insert image using ProseMirror API
+            console.info("[Editor] Image paste detected, starting upload", {
+              name: file.name,
+              size: file.size,
+              type: file.type,
+            });
+            (async () => {
+              try {
+                const publicUrl = await uploadImageToWorkspaceBucket(file);
                 const { state, dispatch } = view;
                 const { selection } = state;
                 const { from } = selection;
-
-                // Create image node
                 const imageNode = state.schema.nodes.image.create({
-                  src: base64,
+                  src: publicUrl,
                 });
-
-                // Insert image at cursor position
                 const tr = state.tr.insert(from, imageNode);
                 dispatch(tr);
+                console.info("[Editor] Image inserted with URL", publicUrl);
+              } catch (err) {
+                console.error("Failed to upload image to Supabase:", err);
+                alert("Image upload failed. Please check Supabase config and bucket permissions.");
               }
-            };
-            reader.onerror = () => {
-              console.error("Failed to read image file");
-            };
-            reader.readAsDataURL(file);
+            })();
             return true; // Handled
           }
         }
         return false; // Let TipTap handle other paste events
       },
       handleDrop: (view, event, slice, moved) => {
-        // Handle image drop
+        // Handle image drop -> upload to Supabase
         if (moved) return false; // Let TipTap handle moved content
 
         const files = Array.from(event.dataTransfer?.files || []);
@@ -289,11 +289,15 @@ export const Editor = forwardRef<any, EditorProps>(function Editor(
 
         if (imageFile) {
           event.preventDefault();
-          const reader = new FileReader();
-          reader.onload = (readerEvent) => {
-            const base64 = readerEvent.target?.result as string;
-            if (base64) {
-              // Get drop position
+          event.stopPropagation();
+          console.info("[Editor] Image drop detected, starting upload", {
+            name: imageFile.name,
+            size: imageFile.size,
+            type: imageFile.type,
+          });
+          (async () => {
+            try {
+              const publicUrl = await uploadImageToWorkspaceBucket(imageFile);
               const coordinates = view.posAtCoords({
                 left: event.clientX,
                 top: event.clientY,
@@ -303,21 +307,21 @@ export const Editor = forwardRef<any, EditorProps>(function Editor(
                 const { state, dispatch } = view;
                 const { pos } = coordinates;
 
-                // Create image node
                 const imageNode = state.schema.nodes.image.create({
-                  src: base64,
+                  src: publicUrl,
                 });
 
-                // Insert image at drop position
                 const tr = state.tr.insert(pos, imageNode);
                 dispatch(tr);
+                console.info("[Editor] Image inserted with URL", publicUrl);
               }
+            } catch (err) {
+              console.error("Failed to upload image to Supabase (drop):", err);
+              alert(
+                "Image upload failed. Please check Supabase config, bucket permissions, and RLS."
+              );
             }
-          };
-          reader.onerror = () => {
-            console.error("Failed to read image file");
-          };
-          reader.readAsDataURL(imageFile);
+          })();
           return true; // Handled
         }
         return false; // Let TipTap handle other drop events
@@ -1546,7 +1550,7 @@ export const Editor = forwardRef<any, EditorProps>(function Editor(
         <div
           ref={lineNumbersRef}
           className="line-numbers-gutter flex-shrink-0 bg-[var(--bg-secondary)] border-r border-[var(--border-primary)] text-right select-none overflow-y-auto overflow-x-hidden"
-          style={{ width: "60px", minWidth: "60px" }}
+          style={{ width: "44px", minWidth: "44px" }}
         >
           <div
             className="line-numbers-content font-mono text-xs text-[var(--text-tertiary)]"

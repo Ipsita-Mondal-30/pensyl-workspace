@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback, memo } from "react";
 interface TopBarProps {
   onOpenSettings?: () => void;
   onOpenAI?: () => void;
+  onOpenProjects?: () => void;
   onAddSource?: (type: "pdf" | "doi" | "zotero") => void;
   onCite?: () => void;
   onExport?: (format: "pdf" | "docx" | "latex" | "markdown") => void;
@@ -21,6 +22,7 @@ interface TopBarProps {
 export function TopBar({
   onOpenSettings,
   onOpenAI,
+  onOpenProjects,
   onAddSource,
   onCite,
   onExport,
@@ -457,9 +459,13 @@ export function TopBar({
           onToggle={toggleDropdown}
         >
           <DropdownItem
-            label="Search papers (Semantic Scholar)"
-            onClick={() => {}}
+            label="Open projects"
+            onClick={() => {
+              onOpenProjects?.();
+              setOpenDropdown(null);
+            }}
           />
+          <DropdownItem label="Search papers (Semantic Scholar)" onClick={() => {}} />
           <DropdownItem label="Search arXiv" onClick={() => {}} />
           <DropdownItem label="Related work suggestions" onClick={() => {}} />
           <DropdownItem label="PDF summaries" onClick={() => {}} />

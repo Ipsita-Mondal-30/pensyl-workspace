@@ -294,7 +294,7 @@ export function Sidebar({
 
   return (
     <>
-      <div className="w-64 bg-[var(--bg-secondary)] border-r border-[var(--border-primary)] flex flex-col h-full">
+      <div className="w-56 bg-[var(--bg-secondary)] border-r border-[var(--border-primary)] flex flex-col h-full">
         {/* Header */}
         <div className="h-10 flex items-center justify-between px-3 border-b border-[var(--border-primary)]">
           <div className="flex items-center gap-2 flex-1 min-w-0">

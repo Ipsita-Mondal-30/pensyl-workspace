@@ -56,3 +56,6 @@ export { LoginPage } from './auth/LoginPage';
 
 // Onboarding components
 export { OnboardingPage } from './onboarding/OnboardingPage';
+
+// Projects
+export { ProjectsScreen } from './projects/ProjectsScreen';
