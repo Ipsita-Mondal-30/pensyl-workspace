@@ -118,11 +118,32 @@ async function* streamMessageViaBackend(
         contextLength: (context || options.context || '').length,
       });
       
+      // Extract blocks from metadata (sent from useAIChat)
+      const blocks = options.metadata?.blocks as Array<{
+        lineNumber: number;
+        type: string;
+        text: string;
+        position: number;
+        endPosition: number;
+        isEmpty: boolean;
+      }> | undefined;
+      
+      console.log('[AIService] Sending to orchestration with blocks:', {
+        hasBlocks: !!blocks,
+        blockCount: blocks?.length || 0,
+        blocksPreview: blocks?.slice(0, 3).map((b: any) => ({
+          lineNumber: b.lineNumber,
+          type: b.type,
+          textPreview: b.text?.substring(0, 50),
+        })),
+      });
+      
       const response = await aiOrchestrationClient.orchestrate({
         prompt: lastMessage.content,
         context: context || options.context,
         metadata: {
           ...options.metadata,
+          blocks: blocks, // CRITICAL: Pass blocks for accurate section resolution
           messageHistory: contextMessages.length,
           selectedModelId: options.selectedModelId,
         },

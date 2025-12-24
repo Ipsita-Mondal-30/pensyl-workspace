@@ -18,18 +18,18 @@
   --text-tertiary: #6a6a6a;
   --text-white: #ffffff;
   
-  /* Accent Colors */
-  --accent-primary: #007acc;
-  --accent-hover: #0098ff;
-  --accent-active: #005a9e;
-  --accent-purple: #8b5cf6;
-  --accent-purple-hover: #a78bfa;
+  /* Accent Colors - Dark theme (black backgrounds) */
+  --accent-primary: #1A1A1C;
+  --accent-hover: #5F7E64;
+  --accent-active: #1B3A34;
+  --accent-purple: #5F7E64;
+  --accent-purple-hover: #A8B8A0;
   
   /* Status Colors */
   --status-success: #4ec9b0;
   --status-warning: #dcdcaa;
   --status-error: #f48771;
-  --status-info: #75beff;
+  --status-info: #5F7E64;
   
   /* UI Element Colors */
   --scrollbar-bg: #1e1e1e;
@@ -99,9 +99,10 @@
   --text-tertiary: #858585;
   --text-white: #1e1e1e;
   
-  --accent-primary: #007acc;
-  --accent-hover: #0098ff;
-  --accent-active: #005a9e;
+  /* Accent Colors - Light theme (white backgrounds) */
+  --accent-primary: #5F7E64;
+  --accent-hover: #A8B8A0;
+  --accent-active: #234E40;
   
   --scrollbar-bg: #ffffff;
   --scrollbar-thumb: #d4d4d4;
@@ -124,9 +125,9 @@
   --text-tertiary: #808080;
   --text-white: #ffffff;
   
-  --accent-primary: #5a9fd4;
-  --accent-hover: #6bb0e5;
-  --accent-active: #4a8fc3;
+  --accent-primary: #234E40;
+  --accent-hover: #5F7E64;
+  --accent-active: #1B3A34;
   
   --scrollbar-bg: #2d2d2d;
   --scrollbar-thumb: #4a4a4a;

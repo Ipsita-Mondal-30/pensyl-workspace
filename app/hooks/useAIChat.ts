@@ -3,6 +3,7 @@ import { useState, useCallback } from 'react';
 import { Editor } from '@tiptap/react';
 import { streamAIMessage, type ChatMessage as AIChatMessage } from '../services/ai-service';
 import { localStorageFS } from '../lib/localStorageFS';
+import { extractEditorBlocks } from '../utils/editor-blocks';
 
 export interface ChatMessage {
     id: string;
@@ -141,6 +142,9 @@ export function useAIChat() {
                 },
             ];
 
+            // Extract editor blocks for accurate section resolution
+            const blocks = options.editor ? extractEditorBlocks(options.editor) : [];
+            
             // Stream response using unified AI service (backend by default)
             for await (const chunk of streamAIMessage(messages, {
                 context: options.currentFileName 
@@ -150,6 +154,7 @@ export function useAIChat() {
                     currentFile: options.currentFileName,
                     currentFilePath: options.currentFilePath,
                     workspacePath: options.workspacePath,
+                    blocks: blocks, // CRITICAL: Send block structure for accurate section resolution
                 },
                 selectedModelId: options.selectedModelId, // Pass selected model ID if provided
             })) {

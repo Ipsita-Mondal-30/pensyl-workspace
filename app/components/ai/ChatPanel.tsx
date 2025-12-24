@@ -875,14 +875,14 @@ export function ChatPanel({
         <div className="flex gap-2 mb-2">
           <button
             onClick={() => setShowPatchTest(true)}
-            className="text-[11px] px-2 py-1 bg-purple-600 hover:bg-purple-700 border border-purple-500 rounded text-white transition-all duration-150 flex items-center gap-1.5"
+            className="text-[11px] px-2 py-1 bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] border border-[var(--accent-primary)] rounded text-white transition-all duration-150 flex items-center gap-1.5"
             title="Test patch insertion"
           >
             <span>🧪 Patch Test</span>
           </button>
           <button
             onClick={() => setShowLineViewer(true)}
-            className="text-[11px] px-2 py-1 bg-blue-600 hover:bg-blue-700 border border-blue-500 rounded text-white transition-all duration-150 flex items-center gap-1.5"
+            className="text-[11px] px-2 py-1 bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] border border-[var(--accent-primary)] rounded text-white transition-all duration-150 flex items-center gap-1.5"
             title="View document lines as JSON"
           >
             <span>📋 View Lines</span>
@@ -949,7 +949,7 @@ export function ChatPanel({
                   </button>
                   <button
                     onClick={handlePatchTest}
-                    className="px-4 py-2 text-white bg-purple-600 rounded transition-colors hover:bg-purple-700"
+                    className="px-4 py-2 text-white bg-[var(--accent-primary)] rounded transition-colors hover:bg-[var(--accent-hover)]"
                   >
                     Apply Patch
                   </button>
@@ -1158,7 +1158,7 @@ export function ChatPanel({
                     navigator.clipboard.writeText(json);
                     alert("✅ JSON copied to clipboard!");
                   }}
-                  className="px-4 py-2 text-white bg-blue-600 rounded transition-colors hover:bg-blue-700"
+                  className="px-4 py-2 text-white bg-[var(--accent-primary)] rounded transition-colors hover:bg-[var(--accent-hover)]"
                 >
                   📋 Copy JSON
                 </button>
