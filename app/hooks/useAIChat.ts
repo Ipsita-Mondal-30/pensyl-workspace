@@ -4,6 +4,7 @@ import { Editor } from '@tiptap/react';
 import { streamAIMessage, type ChatMessage as AIChatMessage } from '../services/ai-service';
 import { localStorageFS } from '../lib/localStorageFS';
 import { extractEditorBlocks } from '../utils/editor-blocks';
+import { extractEditorLines, type DocumentLines } from '../utils/editor-lines';
 
 export interface ChatMessage {
     id: string;
@@ -112,6 +113,7 @@ export function useAIChat() {
 
         try {
             let fullContext = userMessage;
+            let documentLines: DocumentLines | null = null;
 
             // Add current file context if available
             if (options.editor && options.currentFileName) {
@@ -119,6 +121,10 @@ export function useAIChat() {
                 // Format document with line numbers for document editing operations
                 const formattedContent = formatDocumentWithLineNumbers(editorContent);
                 fullContext = `Current file: ${options.currentFileName}\n\n${formattedContent}\n\nUser request: ${userMessage}`;
+                
+                // NEW: Extract line-by-line structure with character positions
+                documentLines = extractEditorLines(options.editor);
+                console.log(`[AIChat] Extracted ${documentLines.lines.length} lines, ${documentLines.totalCharacters} chars`);
             }
 
             // Load referenced files
@@ -142,7 +148,7 @@ export function useAIChat() {
                 },
             ];
 
-            // Extract editor blocks for accurate section resolution
+            // Extract editor blocks for backward compatibility (LEGACY)
             const blocks = options.editor ? extractEditorBlocks(options.editor) : [];
             
             // Stream response using unified AI service (backend by default)
@@ -154,7 +160,9 @@ export function useAIChat() {
                     currentFile: options.currentFileName,
                     currentFilePath: options.currentFilePath,
                     workspacePath: options.workspacePath,
-                    blocks: blocks, // CRITICAL: Send block structure for accurate section resolution
+                    lines: documentLines?.lines, // NEW: Send line-by-line structure (preferred)
+                    totalCharacters: documentLines?.totalCharacters,
+                    blocks: blocks, // LEGACY: Keep for backward compatibility
                 },
                 selectedModelId: options.selectedModelId, // Pass selected model ID if provided
             })) {

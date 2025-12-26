@@ -4,14 +4,17 @@ export interface Patch {
   file: string;
   type?: "insert" | "replace" | "delete";
   line?: number;
-  from?: number;
-  to?: number;
+  from?: number; // Character position start (NEW - for character-based patches)
+  to?: number;   // Character position end (NEW - for character-based patches)
   target?: {
     startLine: number;
     endLine: number;
   };
   content?: string;
   replacement?: string;
+  lineStart?: number; // Optional: for human readability
+  lineEnd?: number;   // Optional: for human readability
+  explanation?: string; // What this patch does
 }
 
 export function parseAIResponse(response: string, fileName?: string): {
@@ -33,12 +36,30 @@ export function parseAIResponse(response: string, fileName?: string): {
           const explanation = response.substring(0, jsonBlockMatch.index).trim();
           
           // Convert backend patch format to frontend Patch format
-          const patches: Patch[] = parsed.patches.map((p: any) => ({
-            type: p.type || 'replace',
-            target: p.target || { startLine: 1, endLine: 1 },
-            content: p.content || '',
-            file: fileName || '',
-          }));
+          const patches: Patch[] = parsed.patches.map((p: any) => {
+            // NEW: Check if this is a character-position patch (has from/to)
+            if (typeof p.from === 'number' && typeof p.to === 'number') {
+              return {
+                type: p.type || 'replace',
+                from: p.from,
+                to: p.to,
+                content: p.content || '',
+                file: fileName || '',
+                lineStart: p.lineStart, // Optional: for human readability
+                lineEnd: p.lineEnd,     // Optional: for human readability
+                explanation: p.explanation,
+              };
+            }
+            
+            // LEGACY: Line-based patch (has target)
+            return {
+              type: p.type || 'replace',
+              target: p.target || { startLine: 1, endLine: 1 },
+              content: p.content || '',
+              file: fileName || '',
+              explanation: p.explanation,
+            };
+          });
 
           return {
             hasPatches: patches.length > 0,
