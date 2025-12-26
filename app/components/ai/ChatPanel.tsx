@@ -15,6 +15,7 @@ import {
   applyPatches,
   type Patch,
 } from "../../utils/patchParser";
+import { extractEditorLines } from "../../utils/editor-lines";
 
 interface Message {
   id: string;
@@ -199,77 +200,46 @@ export function ChatPanel({
     return count;
   };
 
-  // Helper: Generate JSON with line-wise text for debugging
+  // Helper: Generate JSON with line-wise text for debugging (NEW: uses true line-by-line structure)
   const generateLineWiseJSON = (): string => {
     if (!editor) {
       return JSON.stringify({ error: "Editor not available" }, null, 2);
     }
 
-    const { state } = editor.view;
-    const { doc } = state;
-    const lines: Array<{
-      lineNumber: number;
-      type: string;
-      text: string;
-      textPreview: string;
-      isEmpty: boolean;
-      charCount: number;
-      estimatedVisualLines: number;
-      position: number;
-      endPosition: number;
-      nodeSize: number;
-    }> = [];
-
-    let lineNumber = 1;
-    doc.descendants((node, pos) => {
-      if (
-        node.isBlock &&
-        (node.type.name === "paragraph" ||
-          node.type.name.startsWith("heading") ||
-          node.type.name === "codeBlock" ||
-          node.type.name === "blockquote")
-      ) {
-        const text = node.textContent || "";
-        const isEmpty = text.trim() === "";
-        const charCount = text.length;
-        // Estimate visual lines (assuming ~80 chars per line)
-        const estimatedVisualLines =
-          charCount === 0 ? 1 : Math.max(1, Math.ceil(charCount / 80));
-        // Create a preview: first 100 chars or "[EMPTY]"
-        const textPreview = isEmpty
-          ? "[EMPTY]"
-          : text.substring(0, 100) + (text.length > 100 ? "..." : "");
-        const endPos = pos + node.nodeSize;
-
-        lines.push({
-          lineNumber: lineNumber++,
-          type: node.type.name,
-          text: text,
-          textPreview: textPreview,
-          isEmpty: isEmpty,
-          charCount: charCount,
-          estimatedVisualLines: estimatedVisualLines,
-          position: pos,
-          endPosition: endPos,
-          nodeSize: node.nodeSize,
-        });
-      }
-      return true;
+    // Use the new line-by-line extraction (split by \n)
+    const documentLines = extractEditorLines(editor);
+    
+    const lines = documentLines.lines.map((line) => {
+      const textPreview = line.isEmpty
+        ? "[EMPTY]"
+        : line.text.substring(0, 100) + (line.text.length > 100 ? "..." : "");
+      
+      return {
+        lineNumber: line.lineNumber,
+        type: line.isHeading ? (line.headingLevel ? `heading${line.headingLevel}` : "heading") : "paragraph",
+        text: line.text,
+        textPreview: textPreview,
+        isEmpty: line.isEmpty,
+        charCount: line.text.length,
+        estimatedVisualLines: line.isEmpty ? 1 : Math.max(1, Math.ceil(line.text.length / 80)),
+        position: line.from,
+        endPosition: line.to,
+        sectionName: line.sectionName || null,
+        isHeading: line.isHeading,
+        headingLevel: line.headingLevel || null,
+      };
     });
 
     return JSON.stringify(
       {
         totalLines: lines.length,
-        documentSize: doc.content.size,
-        note: "⚠️ IMPORTANT: Line numbers = Block nodes (paragraphs/headings), NOT visual wrapped lines on screen!",
+        documentSize: documentLines.totalCharacters,
+        note: "✅ TRUE LINE-BY-LINE STRUCTURE: Each \\n = one line (like Cursor IDE)",
         explanation: {
-          blockNodes:
-            "Each 'line' is ONE structural element (paragraph, heading, etc.)",
-          visualLines:
-            "A long paragraph might display as 20+ visual lines but counts as 1 block",
-          emptyParagraphs: "Empty paragraphs still count as lines",
-          insertion:
-            "To insert 'at line N', we insert BEFORE the Nth block node",
+          trueLines: "Each line is split by newline character (\\n), not by block nodes",
+          characterPositions: "Each line has 'from' and 'to' character positions for surgical edits",
+          sections: "Section headings are automatically detected (abstract, introduction, etc.)",
+          precision: "This enables surgical edits - update individual sentences, not entire paragraphs",
         },
         lines: lines,
       },
@@ -582,6 +552,48 @@ export function ChatPanel({
     }
 
     try {
+      // NEW: Check if this is a character-position patch
+      if (typeof patch.from === 'number' && typeof patch.to === 'number') {
+        console.log(`📍 Applying CHARACTER-POSITION ${patch.type} patch at positions ${patch.from}-${patch.to}`);
+        
+        const { from, to, type, content } = patch;
+        
+        // Validate character positions
+        const docLength = editor.state.doc.content.size;
+        if (from < 0 || to > docLength || from > to) {
+          console.error(`❌ Invalid positions: from=${from}, to=${to}, docLength=${docLength}`);
+          alert(`Invalid patch positions: from=${from}, to=${to}, docLength=${docLength}`);
+          return;
+        }
+        
+        switch (type) {
+          case 'delete':
+            editor.commands.deleteRange({ from, to });
+            console.log(`✅ Deleted characters ${from}-${to}`);
+            break;
+            
+          case 'insert':
+            editor.commands.insertContentAt(from, content || '');
+            console.log(`✅ Inserted at position ${from}`);
+            break;
+            
+          case 'replace':
+            editor.commands.deleteRange({ from, to });
+            editor.commands.insertContentAt(from, content || '');
+            console.log(`✅ Replaced characters ${from}-${to}`);
+            break;
+            
+          default:
+            console.error(`❌ Unknown patch type: ${type}`);
+            alert(`Unknown patch type: ${type}`);
+            return;
+        }
+        
+        console.log("✅ Character-position patch applied successfully");
+        return;
+      }
+      
+      // LEGACY: Line-based patch handling
       // Validate patch has required fields
       if (!patch.target || !patch.type) {
         console.error("❌ Invalid patch format:", patch);
@@ -591,7 +603,7 @@ export function ChatPanel({
 
       const { startLine, endLine } = patch.target;
       console.log(
-        `📍 Applying ${patch.type} patch at lines ${startLine}-${endLine}`
+        `📍 Applying LINE-BASED ${patch.type} patch at lines ${startLine}-${endLine}`
       );
 
       const { state } = editor.view;
@@ -972,10 +984,10 @@ export function ChatPanel({
               <div className="flex justify-between items-center mb-4">
                 <div>
                   <h3 className="text-lg font-semibold text-[var(--text-primary)]">
-                    📋 Document Structure (Block Nodes)
+                    📋 Document Structure (True Line-by-Line)
                   </h3>
                   <p className="text-xs text-[var(--text-tertiary)] mt-1">
-                    ⚠️ Line numbers = block nodes (not visual wrapped lines)
+                    ✅ Each \n = one line (like Cursor IDE) • Character positions for surgical edits
                   </p>
                 </div>
                 <button
@@ -1060,78 +1072,75 @@ export function ChatPanel({
                   <tbody>
                     {(() => {
                       if (!editor) return null;
-                      const { state } = editor.view;
-                      const { doc } = state;
+                      
+                      // Use the new line-by-line extraction
+                      const documentLines = extractEditorLines(editor);
                       const rows: React.ReactElement[] = [];
-                      let lineNum = 1;
 
-                      doc.descendants((node, pos) => {
-                        if (
-                          node.isBlock &&
-                          (node.type.name === "paragraph" ||
-                            node.type.name.startsWith("heading") ||
-                            node.type.name === "codeBlock" ||
-                            node.type.name === "blockquote")
-                        ) {
-                          const text = node.textContent || "";
-                          const isEmpty = text.trim() === "";
-                          const charCount = text.length;
-                          const estVisual =
-                            charCount === 0
-                              ? 1
-                              : Math.max(1, Math.ceil(charCount / 80));
-                          const preview = isEmpty
-                            ? "[EMPTY]"
-                            : text.substring(0, 60) +
-                              (text.length > 60 ? "..." : "");
+                      documentLines.lines.forEach((line) => {
+                        const estVisual = line.isEmpty
+                          ? 1
+                          : Math.max(1, Math.ceil(line.text.length / 80));
+                        const preview = line.isEmpty
+                          ? "[EMPTY]"
+                          : line.text.substring(0, 60) +
+                            (line.text.length > 60 ? "..." : "");
 
-                          rows.push(
-                            <tr
-                              key={lineNum}
-                              className="border-b border-[var(--border-primary)] hover:bg-[var(--bg-hover)] transition-colors"
-                            >
-                              <td className="p-2 font-mono font-semibold text-[var(--accent-primary)]">
-                                {lineNum}
-                              </td>
-                              <td className="p-2 text-[var(--text-secondary)]">
-                                <code className="text-xs bg-[var(--bg-primary)] px-1 py-0.5 rounded">
-                                  {node.type.name}
-                                </code>
-                              </td>
-                              <td className="p-2">
-                                {isEmpty ? (
-                                  <span className="text-orange-400">
-                                    ⚠️ Empty
-                                  </span>
-                                ) : estVisual > 10 ? (
-                                  <span className="text-yellow-400">
-                                    ⚠️ Long
-                                  </span>
-                                ) : (
-                                  <span className="text-green-400">
-                                    ✓ Normal
-                                  </span>
-                                )}
-                              </td>
-                              <td className="p-2 text-[var(--text-secondary)] font-mono">
-                                {charCount}
-                              </td>
-                              <td className="p-2 text-[var(--text-secondary)] font-mono">
-                                ~{estVisual} lines
-                              </td>
-                              <td className="p-2 text-[var(--text-tertiary)] font-mono text-[10px]">
-                                {pos}-{pos + node.nodeSize}
-                              </td>
-                              <td className="p-2 text-[var(--text-secondary)] max-w-md truncate">
-                                <span className={isEmpty ? "italic" : ""}>
-                                  {preview}
+                        rows.push(
+                          <tr
+                            key={line.lineNumber}
+                            className="border-b border-[var(--border-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+                          >
+                            <td className="p-2 font-mono font-semibold text-[var(--accent-primary)]">
+                              {line.lineNumber}
+                            </td>
+                            <td className="p-2 text-[var(--text-secondary)]">
+                              <code className="text-xs bg-[var(--bg-primary)] px-1 py-0.5 rounded">
+                                {line.isHeading 
+                                  ? (line.headingLevel ? `heading${line.headingLevel}` : "heading")
+                                  : "paragraph"}
+                              </code>
+                              {line.sectionName && (
+                                <span className="ml-2 text-[10px] text-[var(--accent-primary)]">
+                                  [{line.sectionName}]
                                 </span>
-                              </td>
-                            </tr>
-                          );
-                          lineNum++;
-                        }
-                        return true;
+                              )}
+                            </td>
+                            <td className="p-2">
+                              {line.isEmpty ? (
+                                <span className="text-orange-400">
+                                  ⚠️ Empty
+                                </span>
+                              ) : line.isHeading ? (
+                                <span className="text-blue-400">
+                                  📌 Heading
+                                </span>
+                              ) : estVisual > 10 ? (
+                                <span className="text-yellow-400">
+                                  ⚠️ Long
+                                </span>
+                              ) : (
+                                <span className="text-green-400">
+                                  ✓ Normal
+                                </span>
+                              )}
+                            </td>
+                            <td className="p-2 text-[var(--text-secondary)] font-mono">
+                              {line.text.length}
+                            </td>
+                            <td className="p-2 text-[var(--text-secondary)] font-mono">
+                              ~{estVisual} lines
+                            </td>
+                            <td className="p-2 text-[var(--text-tertiary)] font-mono text-[10px]">
+                              {line.from}-{line.to}
+                            </td>
+                            <td className="p-2 text-[var(--text-secondary)] max-w-md truncate">
+                              <span className={line.isEmpty ? "italic" : ""}>
+                                {preview}
+                              </span>
+                            </td>
+                          </tr>
+                        );
                       });
 
                       return rows;

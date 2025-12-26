@@ -121,6 +121,7 @@ export const Editor = forwardRef<any, EditorProps>(function Editor(
   const [currentLine, setCurrentLine] = useState(1);
   const editorContentRef = useRef<HTMLDivElement>(null);
   const lineNumbersRef = useRef<HTMLDivElement>(null);
+  const isInternalUpdate = useRef(false); // Track if update is from user typing
 
   // Search state
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -233,8 +234,13 @@ export const Editor = forwardRef<any, EditorProps>(function Editor(
     editable,
     onUpdate: ({ editor }) => {
       const html = editor.getHTML();
+      isInternalUpdate.current = true; // Mark this as user edit
       onChange?.(html);
       onUpdate?.(html !== content);
+      // Reset flag after a short delay
+      setTimeout(() => {
+        isInternalUpdate.current = false;
+      }, 100);
     },
     editorProps: {
       attributes: {
@@ -270,7 +276,9 @@ export const Editor = forwardRef<any, EditorProps>(function Editor(
                 console.info("[Editor] Image inserted with URL", publicUrl);
               } catch (err) {
                 console.error("Failed to upload image to Supabase:", err);
-                alert("Image upload failed. Please check Supabase config and bucket permissions.");
+                alert(
+                  "Image upload failed. Please check Supabase config and bucket permissions."
+                );
               }
             })();
             return true; // Handled
@@ -564,25 +572,9 @@ export const Editor = forwardRef<any, EditorProps>(function Editor(
     };
   }, [editor, onCursorChange]);
 
-  useEffect(() => {
-    if (editor) {
-      const currentContent = editor.getHTML();
-      // Only update if content actually changed (avoid infinite loops)
-      if (content !== currentContent && content !== undefined) {
-        // If content is markdown (doesn't start with <), parse it
-        if (
-          content &&
-          !content.trim().startsWith("<") &&
-          content.trim().length > 0
-        ) {
-          // TipTap can parse markdown directly
-          editor.commands.setContent(content);
-        } else {
-          editor.commands.setContent(content || "");
-        }
-      }
-    }
-  }, [content, editor]);
+  // Remove this useEffect entirely - let onUpdate handle content changes
+  // This prevents the circular update loop that causes cursor jumping
+  // The editor manages its own content, and only syncs to parent via onChange
 
   useEffect(() => {
     return () => {

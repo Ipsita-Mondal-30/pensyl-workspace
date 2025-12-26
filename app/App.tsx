@@ -218,6 +218,12 @@ function App() {
     );
     if (!activeProjectTab) return;
 
+    // CRITICAL: Don't update content if user is typing (editor is focused)
+    // This prevents cursor jumping to the end
+    if (editorRef.current.isFocused) {
+      return;
+    }
+
     // Support stringified JSON from API
     const jsonContent =
       typeof currentProjectJson === "string"
